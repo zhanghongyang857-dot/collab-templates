@@ -105,6 +105,7 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 
 | 字段 | 含义 |
 |---|---|
+| `output` | 看板生成位置，默认 `NOW/看板.html`；例如设为 `~/Desktop/看板.html`，让桌面只放看板、数据放别处 |
 | `categories` | `[{name, keywords, color}]`，顺序即匹配优先级 |
 | `rest_keywords` | 今天.md 里表示休息、不计时的关键词 |
 | `deadlines.file` | 截止来源文件，相对 `NOW/` 或绝对路径，可用 `~` |
@@ -113,6 +114,8 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | `deadlines.final_keyword` | 事项名含这个词时单独列为期末 |
 | `deadlines.note` | 截止卡片右上角链接的文字 |
 | `done_show` | 「最近完成」显示几条 |
+
+**NOW 放在别处时**：`init.sh now <目录>` 建在任意目录；之后建任务时用 `NOW_PATH=<目录>/NOW.md init.sh small`，让 PROGRESS 顶部的「← NOW」链接指对位置。下面 hook 里的路径也换成对应的 `build.py`。
 
 **自动刷新（可选）**：在 `~/.claude/settings.json` 加一个 Stop hook，Claude Code 每轮回答结束后检查相关文件，有变化才重新生成：
 

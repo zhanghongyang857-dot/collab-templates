@@ -44,7 +44,7 @@ DL = CFG["deadlines"]
 EXAMS_MD = _path(DL.get("file"))
 DL_GROUPS = DL.get("groups") or []  # 只显示这些分组（标题第一个词）；为空则全部显示
 TEMPLATE = HERE / "template.html"
-OUT = HERE / "看板.html"
+OUT = _path(CFG.get("output"), HERE / "看板.html")  # 可在 config.json 用 output 指定生成位置
 
 # 关键词 → 分类配色键（顺序即优先级）：先「不计时」，再按 config 中分类的顺序
 CATEGORIES = [(k, "rest") for k in CFG["rest_keywords"]] + [
