@@ -1,0 +1,19 @@
+{
+  "now_md": "../NOW.md",
+  "categories": [
+    {"name": "工作", "keywords": ["工作"], "color": "blue"},
+    {"name": "项目", "keywords": ["项目"], "color": "green"},
+    {"name": "学习", "keywords": ["学习", "课程"], "color": "orange"},
+    {"name": "探索", "keywords": ["探索"], "color": "purple"},
+    {"name": "杂务", "keywords": ["杂务"], "color": "gray"}
+  ],
+  "rest_keywords": ["不计时"],
+  "deadlines": {
+    "file": "截止.md",
+    "groups": [],
+    "category": "学习",
+    "final_keyword": "期末",
+    "note": "截止.md"
+  },
+  "done_show": 5
+}

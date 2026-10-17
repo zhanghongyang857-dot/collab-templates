@@ -5,7 +5,9 @@
 #   init.sh large   [目标目录] [-n 项目名]   新建大版本
 #   init.sh upgrade [目标目录]               小版本升级为大版本（补齐 协作/，不动已有文件）
 #   init.sh protocol [目标目录]              用最新模板覆盖 协作/协议.md（只此一个文件）
-# 原则：除 protocol 外从不覆盖已有文件；已有 AGENTS.md / CLAUDE.md 只追加入口说明。
+#   init.sh now        [目录，默认 ~/Desktop]  建立 NOW 总看板（NOW.md + NOW/ 目录）
+#   init.sh now-update [目录，默认 ~/Desktop]  用最新模板覆盖 NOW/build.py 和 NOW/template.html（不动数据和配置）
+# 原则：除 protocol、now-update 外从不覆盖已有文件；已有 AGENTS.md / CLAUDE.md 只追加入口说明。
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,12 +16,13 @@ DEST="."; NAME=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -n) NAME="${2:?-n 需要项目名}"; shift 2 ;;
-    -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
     *) DEST="$1"; shift ;;
   esac
 done
 
-case "$MODE" in small|large|upgrade|protocol) ;; *) sed -n '2,8p' "$0"; exit 1 ;; esac
+case "$MODE" in small|large|upgrade|protocol|now|now-update) ;; *) sed -n '2,10p' "$0"; exit 1 ;; esac
+if [ "$MODE" = now ] || [ "$MODE" = now-update ]; then [ "$DEST" != "." ] || DEST="$HOME/Desktop"; fi
 mkdir -p "$DEST"
 DEST="$(cd "$DEST" && pwd)"
 [ -n "$NAME" ] || NAME="$(basename "$DEST")"
@@ -34,12 +37,16 @@ copy_one() {  # $1 源文件  $2 目标文件
   local src="$1" dst="$2"
   if [ -e "$dst" ]; then skipped+=("${dst#$DEST/}"); return; fi
   mkdir -p "$(dirname "$dst")"
-  if [ "$(basename "$src")" = "PROGRESS.md" ]; then
+  if [ "${src##*.}" = "md" ]; then
     python3 - "$src" "$dst" "$NAME" "$NOW_REL" "$TODAY" <<'PY'
-import sys
+import sys, datetime as dt
 src, dst, name, now, today = sys.argv[1:]
+wd = "一二三四五六日"
+d0 = dt.date.today(); d1 = d0 + dt.timedelta(days=14)
 t = open(src, encoding="utf-8").read()
-t = t.replace("{{项目名}}", name).replace("{{NOW路径}}", now).replace("{{日期}}", today)
+for k, v in {"项目名": name, "NOW路径": now, "日期": today, "今天": d0.strftime("%m-%d"),
+             "周几": "周" + wd[d0.weekday()], "示例日期": d1.isoformat(), "示例周几": "周" + wd[d1.weekday()]}.items():
+    t = t.replace("{{" + k + "}}", v)
 open(dst, "w", encoding="utf-8").write(t)
 PY
   else
@@ -82,12 +89,27 @@ case "$MODE" in
   protocol)
     [ -d "$DEST/协作" ] || { echo "未找到 协作/，这不是大版本项目：$DEST"; exit 1; }
     cp "$SRC/large/协作/协议.md" "$DEST/协作/协议.md"; created+=("协作/协议.md（已更新）") ;;
+  now)
+    copy_tree "$SRC/now"
+    python3 "$DEST/NOW/build.py" >/dev/null && created+=("NOW/看板.html（已生成）") ;;
+  now-update)
+    [ -d "$DEST/NOW" ] || { echo "未找到 NOW/：$DEST"; exit 1; }
+    for f in build.py template.html; do cp "$SRC/now/NOW/$f" "$DEST/NOW/$f"; created+=("NOW/$f（已更新）"); done
+    python3 "$DEST/NOW/build.py" >/dev/null && created+=("NOW/看板.html（已生成）") ;;
 esac
 
 echo "目标：$DEST（$MODE）"
 [ ${#created[@]}  -eq 0 ] || printf '  新建  %s\n' "${created[@]}"
 [ ${#appended[@]} -eq 0 ] || printf '  追加  %s\n' "${appended[@]}"
 [ ${#skipped[@]}  -eq 0 ] || printf '  跳过（已存在）  %s\n' "${skipped[@]}"
+
+if [ "$MODE" = now ]; then cat <<MSG
+
+下一步：
+  1. 改 NOW/config.json 里的分类（和 NOW.md 大方向的方向名对应）与截止来源
+  2. 想让 Claude Code 每轮回答后自动刷新看板，在 ~/.claude/settings.json 加 Stop hook（见模板仓库 README「NOW 总看板」）
+MSG
+fi
 
 if [ "$MODE" = upgrade ]; then cat <<MSG
 
