@@ -278,6 +278,6 @@ if [ "$MODE" = upgrade ]; then cat <<MSG
   1. 任务.md 中未完成的卡片拆成 任务/T00x-*.md；已完成的移到 归档/任务/
   2. PROGRESS「决议」每条展开写进 决议.md，PROGRESS 中改名为「生效决议」只留一行摘要
   3. PROGRESS 中「任务」改为「进行中」，补上「加载地图」（照抄 $SRC/large/collab/PROGRESS.md），删除末尾「协作规则」
-  4. 归档.md 的内容分到 归档/ 下，然后删除 任务.md 和 归档.md
+  4. 归档.md 的内容分到 归档/ 下，然后删除 任务.md 和 归档.md（日志.md 两版通用，不用动）
 MSG
 fi

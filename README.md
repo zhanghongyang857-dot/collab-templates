@@ -9,6 +9,8 @@
 
 多个 AI 助手（Codex、Claude、Antigravity 等）共用同一份项目上下文的文件模板。用户在各个原生应用里分别对话，成员通过这些文件了解现状、决议和分工，并把结论写回。
 
+v3 起：日志单独放在 `collab/日志.md`，PROGRESS 只放当前状态；任务卡用「流转」表记录每次状态变化。
+
 核心约定：**协作文件全部放在 `collab/` 下，项目根目录只多一个 `AGENTS.md`；`collab/PROGRESS.md` 是每个项目唯一的入口，也是唯一先加载的文件**；其他文件按需读取。详细推理和执行过程留在各自的原生会话，公共文件只写结论和位置。
 
 ## 两个版本
@@ -16,8 +18,8 @@
 | | 小版本 `small` | 大版本 `large` |
 |---|---|---|
 | 适用 | 任务少、主要一两个成员、不需要多方讨论 | 多成员分别发表观点、任务多、决议多 |
-| 文件（都在 `collab/` 下） | `PROGRESS.md` `任务.md` `归档.md` | `PROGRESS.md` 协议、成员、决议、议题、任务、经验、归档 |
-| 规则 | 写在 PROGRESS.md 末尾（8 条） | 独立的 `collab/协议.md`，各项目通用 |
+| 文件（都在 `collab/` 下） | `PROGRESS.md` `任务.md` `成员.md` `日志.md` `归档.md` | `PROGRESS.md` `日志.md` 协议、成员、决议、议题、任务、经验、归档 |
+| 规则 | 写在 PROGRESS.md 末尾（10 条） | 独立的 `collab/协议.md`，各项目通用 |
 | 决议 | PROGRESS 里一行一条 | PROGRESS 一行摘要 + `collab/决议.md` 全文 |
 | 讨论 | 在原生会话里进行，只记结论 | `collab/议题/`，两轮发言 + 用户裁决 |
 
@@ -105,7 +107,7 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | 目标、截止、状态 | 顶部 `目标：… ｜ 截止：… ｜ 状态：…` |
 | 下一步 | `## ▶ 下一步` 下的内容（鼠标悬停显示） |
 | 卡点数 | `## 卡点` 开头的小节里 `- ` 开头的行 |
-| 活跃度、更新天数 | `## 日志` 下每个 `### YYYY-MM-DD` 标题及其条目数 |
+| 活跃度、更新天数 | 同目录 `日志.md` 中每个 `### YYYY-MM-DD` 标题及其条目数（没有 `日志.md` 时读 PROGRESS 的 `## 日志`） |
 
 任务按 NOW.md 任务表的「分类」归到大方向：分类和方向名都按 `config.json` 里 `categories` 的关键词匹配，匹配到同一个分类就在同一条泳道。每个分类用一种颜色（`blue` `green` `orange` `purple` `gray` `teal` `pink` `red`）。
 
@@ -150,9 +152,9 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 ```
 init.sh
 small/   AGENTS.md  .claude/CLAUDE.md
-         collab/ PROGRESS.md 任务.md 归档.md
+         collab/ PROGRESS.md 任务.md 成员.md 日志.md 归档.md
 large/   AGENTS.md  .claude/CLAUDE.md
-         collab/ PROGRESS.md 协议.md 成员.md 决议.md 经验.md 议题/_模板.md 任务/_模板.md 归档/
+         collab/ PROGRESS.md 日志.md 协议.md 成员.md 决议.md 经验.md 议题/_模板.md 任务/_模板.md 归档/
 now/     NOW.md
          NOW/ 今天.md 本月布局.md 已完成.md 截止.md config.json build.py template.html
 ```

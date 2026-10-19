@@ -185,15 +185,23 @@ def parse_progress(path):
     info["next"] = inline(nxt, base) if nxt else ""
     _, bl = find_section(secs, "卡点")
     info["blockers"] = sum(1 for l in bl if l.strip().startswith("- ") and not placeholder(l.strip()[2:]))
-    m = re.search(r"^### (\d{4}-\d{2}-\d{2})", text, re.M)
+    log = log_lines(path, secs)
+    m = next((re.match(r"^### (\d{4}-\d{2}-\d{2})", l) for l in log if l.startswith("### ")), None)
     info["last"] = m.group(1) if m else ""
-    info["activity"] = log_activity(text)
+    info["activity"] = log_activity(log)
     return info
 
 
-def log_activity(text):
+def log_lines(path, secs):
+    """日志行：优先同目录的 日志.md（v3），否则 PROGRESS.md 的「日志」一节（v1/v2）。"""
+    f = path.parent / "日志.md"
+    if f.exists():
+        return f.read_text(encoding="utf-8").splitlines()
+    return find_section(secs, "日志")[1]
+
+
+def log_activity(lines):
     """日志中每个 `### YYYY-MM-DD` 下的条目数 → {日期: 条数}，用于近 14 天活跃度格子。"""
-    _, lines = find_section(sections(text), "日志")
     act, day = {}, None
     for l in lines:
         m = re.match(r"^### (\d{4}-\d{2}-\d{2})", l)
@@ -271,7 +279,7 @@ def sources():
             for r in table_dicts(md.read_text(encoding="utf-8").splitlines()):
                 _, path = link_parts(r.get("任务", ""), base)
                 if path:
-                    files.append(path)
+                    files += [path, path.parent / "日志.md"]
     return [f for f in files if f.exists()]
 
 
