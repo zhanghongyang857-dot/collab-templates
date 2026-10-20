@@ -8,23 +8,48 @@
 #   init.sh migrate [目标目录]               v1 旧布局（根目录 PROGRESS.md、协作/）迁到 collab/，并改好链接
 #   init.sh now        [目录，默认 ~/Desktop]  建立 NOW 总看板（NOW.md + NOW/ 目录）
 #   init.sh now-update [目录，默认 ~/Desktop]  用最新模板覆盖 NOW/build.py 和 NOW/template.html（不动数据和配置）
+#   init.sh team       [班子目录，默认 ~/.collab-team]  从示例建立你的 班子.json
+#   init.sh team-sync  [目标目录] [--all] [--force]   按 班子.json 重新生成 collab/成员.md；--all 刷 NOW 任务表里的全部项目
+# 班子：有 ~/.collab-team/班子.json（或环境变量 COLLAB_TEAM 指定的目录）时，新建项目的 成员.md 按它生成。
 # 布局：协作文件全部在 collab/ 下；项目根目录只放 AGENTS.md，Claude Code 通过 .claude/CLAUDE.md 导入它。
 # 原则：除 protocol、now-update 外从不覆盖已有文件；已有 AGENTS.md / CLAUDE.md 只追加入口说明。
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"; shift || true
-DEST="."; NAME=""
+DEST="."; NAME=""; ALL=0; FORCE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -n) NAME="${2:?-n 需要项目名}"; shift 2 ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    --all) ALL=1; shift ;;
+    --force) FORCE="--force"; shift ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) DEST="$1"; shift ;;
   esac
 done
 
-case "$MODE" in small|large|upgrade|protocol|migrate|now|now-update) ;; *) sed -n '2,13p' "$0"; exit 1 ;; esac
+case "$MODE" in small|large|upgrade|protocol|migrate|now|now-update|team|team-sync) ;; *) sed -n '2,16p' "$0"; exit 1 ;; esac
 if [ "$MODE" = now ] || [ "$MODE" = now-update ]; then [ "$DEST" != "." ] || DEST="$HOME/Desktop"; fi
+TEAM_DIR="${COLLAB_TEAM:-$HOME/.collab-team}"
+TEAM_FILE="$TEAM_DIR/班子.json"
+if [ "$MODE" = team ]; then
+  [ "$DEST" != "." ] || DEST="$TEAM_DIR"
+  python3 "$SRC/team.py" init "$DEST"; exit $?
+fi
+if [ "$MODE" = team-sync ]; then
+  [ -f "$TEAM_FILE" ] || { echo "没有班子配置：$TEAM_FILE（先运行 init.sh team）"; exit 1; }
+  if [ "$ALL" = 1 ]; then
+    NOW_FILE="${NOW_PATH:-$HOME/Desktop/NOW.md}"
+    rc=0
+    while IFS= read -r proj; do
+      python3 "$SRC/team.py" render "$TEAM_FILE" "$proj/collab/成员.md" $FORCE || rc=1
+    done < <(python3 "$SRC/team.py" projects "$NOW_FILE")
+    exit $rc
+  fi
+  DEST="$(cd "$DEST" && pwd)"
+  [ -e "$DEST/collab/PROGRESS.md" ] || { echo "未找到 collab/PROGRESS.md：$DEST"; exit 1; }
+  python3 "$SRC/team.py" render "$TEAM_FILE" "$DEST/collab/成员.md" $FORCE; exit $?
+fi
 mkdir -p "$DEST"
 DEST="$(cd "$DEST" && pwd)"
 [ -n "$NAME" ] || NAME="$(basename "$DEST")"
@@ -95,7 +120,13 @@ case "$MODE" in
       echo "已存在 collab/PROGRESS.md，未做任何改动：$DEST"
       echo "小版本升级用：init.sh upgrade \"$DEST\""; exit 1
     fi
-    copy_tree "$SRC/$MODE"; pointer "$SRC/$MODE" ;;
+    copy_tree "$SRC/$MODE"; pointer "$SRC/$MODE"
+    if [ -f "$TEAM_FILE" ] && printf '%s\n' "${created[@]}" | grep -qx 'collab/成员.md'; then
+      rm "$DEST/collab/成员.md"
+      python3 "$SRC/team.py" render "$TEAM_FILE" "$DEST/collab/成员.md" >/dev/null
+      kept=(); for c in "${created[@]}"; do [ "$c" = "collab/成员.md" ] || kept+=("$c"); done
+      created=("${kept[@]}" "collab/成员.md（按班子 $TEAM_FILE 生成）")
+    fi ;;
   upgrade)
     old_layout_hint
     [ -e "$DEST/collab/PROGRESS.md" ] || { echo "未找到 collab/PROGRESS.md：$DEST"; exit 1; }

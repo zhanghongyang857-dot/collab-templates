@@ -72,8 +72,27 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | `migrate [目录]` | v1 旧布局（根目录 `PROGRESS.md`、`协作/`）迁到 `collab/`：改写移动文件和项目内指向它们的链接、NOW 里的链接，更新入口说明；需要时用 `NOW_PATH` 指明 NOW 位置 |
 | `now [目录]` | 建立 NOW 总看板；目录默认 `~/Desktop` |
 | `now-update [目录]` | 用最新模板覆盖 `NOW/build.py` 和 `NOW/template.html`，不动数据和 `config.json` |
+| `team [班子目录]` | 从示例建立你的班子配置 `班子.json`，默认 `~/.collab-team` |
+| `team-sync [目录] [--all] [--force]` | 按班子配置重新生成 `collab/成员.md`；默认只刷当前项目，`--all` 刷 NOW 任务表里的全部项目；不是生成的文件要加 `--force`（原文件备份为 `成员.md.bak`） |
 
 模板更新后：`git -C ~/.collab-templates pull`，再对需要的项目运行 `protocol`，对看板运行 `now-update`。
+
+## 你的班子
+
+模板里的成员表是空框架。你自己的班子（有哪些成员、型号、档位、成本、唤醒和续接命令、权限）写在**班子配置**里，只写一次，各项目共用：
+
+```bash
+~/.collab-templates/init.sh team
+```
+
+会建立 `~/.collab-team/班子.json`（从 `team-example/班子.json` 复制），按你的成员改写。之后：
+
+- `init.sh small` / `large` 新建项目时，`collab/成员.md` 直接按班子生成，不再是空表；
+- 改了班子后，在项目目录运行 `init.sh team-sync` 刷新该项目的 `成员.md`（加 `--all` 刷 NOW 里的全部项目）；
+- 生成的 `成员.md` 顶部有标记，除末尾「## 本项目补充」一节外不要手改，那一节在刷新时保留；
+- 派活脚本（如果你用）也直接读 `班子.json` 里的命令。
+
+班子目录可用环境变量 `COLLAB_TEAM` 改位置。建议把 `~/.collab-team` 做成你自己的私有仓库：换电脑时拉下模板仓库和班子仓库，班子就能直接用。没有班子配置时，一切照旧。
 
 ## NOW 总看板
 
@@ -148,15 +167,17 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 - 已有的 `AGENTS.md` / `CLAUDE.md` 只追加入口说明，重复运行不会重复追加。
 - `PROGRESS.md` 顶部注释标明模板版本（如 `large v2`；v2 起协作文件放在 `collab/`）。协议有不兼容的修改时升主版本号。
 - 默认 NOW 路径为 `~/Desktop/NOW.md`，可用环境变量 `NOW_PATH` 覆盖。
+- `team-sync` 只改 `collab/成员.md`，且只覆盖带生成标记的文件（或加 `--force`，先备份）；「本项目补充」一节始终保留。
 
 ## 目录
 
 ```
-init.sh
+init.sh  team.py（班子配置 → 成员.md）
+team-example/ 班子.json（班子配置示例）
 small/   AGENTS.md  .claude/CLAUDE.md
-         collab/ PROGRESS.md 任务.md 成员.md 日志.md 归档.md
+         collab/ PROGRESS.md 目标.md 任务.md 成员.md 日志.md 归档.md 议题/_模板.md
 large/   AGENTS.md  .claude/CLAUDE.md
-         collab/ PROGRESS.md 日志.md 协议.md 成员.md 决议.md 经验.md 议题/_模板.md 任务/_模板.md 归档/
+         collab/ PROGRESS.md 日志.md 协议.md 成员.md 决议.md 经验.md 议题/_模板.md 目标/_模板.md 任务/_模板.md 归档/
 now/     NOW.md
          NOW/ 今天.md 本月布局.md 已完成.md 截止.md config.json build.py template.html
 ```
