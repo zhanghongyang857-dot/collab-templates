@@ -72,8 +72,8 @@ def render(team: dict, src: Path) -> str:
         name, did = x.get("名称", "?"), x.get("派活名", "")
         lines += ["", f"## {name}", f"- 职能：{x.get('职能', '待填')}"]
         if did and disp:
-            lines += [f"- 唤醒：`dispatch start T00x <席位> {did} \"<启动语>\"`，总管以后台命令运行。",
-                      "- 续接：`dispatch continue T00x <席位> \"<追问或返工要求>\"`；中途插话先 `dispatch stop <编号>` 再续接。"]
+            lines += [f"- 唤醒：`dispatch start G00x-Tn <席位> {did} \"<启动语>\"`，总管以后台命令运行。",
+                      "- 续接：`dispatch continue G00x-Tn <席位> \"<追问或返工要求>\"`；中途插话先 `dispatch stop <编号>` 再续接。"]
         else:
             lines += [f"- 唤醒：{x.get('唤醒', '待填')}", f"- 续接：{x.get('续接', '待填')}"]
         for k in ("权限", "回看", "备注"):
