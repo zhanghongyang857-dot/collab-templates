@@ -4,7 +4,7 @@
 #   init.sh small   [目标目录] [-n 项目名]   新建小版本
 #   init.sh large   [目标目录] [-n 项目名]   新建大版本
 #   init.sh upgrade [目标目录]               小版本升级为大版本（在 collab/ 补齐文件，不动已有文件）
-#   init.sh protocol [目标目录]              用最新模板覆盖 collab/协议.md（只此一个文件）
+#   init.sh protocol [目标目录]              用最新模板更新 collab/协议.md（只此一个文件，保留「本项目补充」一节）
 #   init.sh migrate [目标目录]               v1 旧布局（根目录 PROGRESS.md、协作/）迁到 collab/，并改好链接
 #   init.sh now        [目录，默认 ~/Desktop]  建立 NOW 总看板（NOW.md + NOW/ 目录）
 #   init.sh now-update [目录，默认 ~/Desktop]  用最新模板覆盖 NOW/build.py 和 NOW/template.html（不动数据和配置）
@@ -134,7 +134,20 @@ case "$MODE" in
   protocol)
     old_layout_hint
     [ -e "$DEST/collab/协议.md" ] || { echo "未找到 collab/协议.md，这不是大版本项目：$DEST"; exit 1; }
-    cp "$SRC/large/collab/协议.md" "$DEST/collab/协议.md"; created+=("collab/协议.md（已更新）") ;;
+    # 用新模板覆盖，但保留项目自己的「本项目补充」一节（旧协议没有这一节时用模板里的空节）
+    python3 - "$SRC/large/collab/协议.md" "$DEST/collab/协议.md" <<'PY'
+import re, sys
+from pathlib import Path
+src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+new, old = src.read_text(encoding="utf-8"), dst.read_text(encoding="utf-8")
+pat = re.compile(r"(?ms)^## (?:\d+\. )?本项目补充\s*\n.*\Z")
+m = pat.search(old)
+if m:
+    body = m.group(0).split("\n", 1)[1]
+    new = pat.sub(lambda n: n.group(0).split("\n", 1)[0] + "\n" + body, new)
+dst.write_text(new, encoding="utf-8")
+PY
+    created+=("collab/协议.md（已更新，保留「本项目补充」）") ;;
   migrate)
     [ -e "$DEST/PROGRESS.md" ] || { echo "根目录没有 PROGRESS.md，无需迁移：$DEST"; exit 1; }
     [ ! -e "$DEST/collab" ] || { echo "已存在 collab/，请先手动处理：$DEST"; exit 1; }
