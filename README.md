@@ -138,7 +138,7 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 
 | 字段 | 含义 |
 |---|---|
-| `output` | 看板生成位置，默认 `NOW/看板.html`；例如设为 `~/Desktop/看板.html`，让桌面只放看板、数据放别处 |
+| `output` | 看板生成位置，默认 `NOW/看板.html`；相对路径从 `NOW/` 算，可用 `~`。例如设为 `~/Desktop/看板.html`，让桌面只放看板；用常驻网页时设为 `备份/看板.html` |
 | `categories` | `[{name, keywords, color}]`，顺序即匹配优先级 |
 | `rest_keywords` | 今天.md 里表示休息、不计时的关键词 |
 | `deadlines.file` | 截止来源文件，相对 `NOW/` 或绝对路径，可用 `~` |
@@ -147,6 +147,8 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | `deadlines.final_keyword` | 事项名含这个词时单独列为期末 |
 | `deadlines.note` | 截止卡片右上角链接的文字 |
 | `done_show` | 「最近完成」显示几条 |
+
+**代码和数据分开放**：`build.py --now-dir <NOW 目录>`（或环境变量 `NOW_DATA_DIR`）读指定目录的数据和 `config.json`，`template.html` 用脚本同目录那份。这样 NOW 目录只放数据，代码只留模板仓库一份，不用 `now-update`。看板网页服务就是这样调用的。
 
 **NOW 放在别处时**：`init.sh now <目录>` 建在任意目录；之后建任务时用 `NOW_PATH=<目录>/NOW.md init.sh small`，让 PROGRESS 顶部的「← NOW」链接指对位置。下面 hook 里的路径也换成对应的 `build.py`。
 
@@ -161,6 +163,12 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 ```
 
 只在 Claude Code 里生效；在其他应用或手动改了文件，下一次 Claude 回答结束时补上，或手动运行 `python3 ~/Desktop/NOW/build.py`。
+
+**常驻网页（推荐，替代静态文件和 hook）**：协作工具包的 `tools/board` 是一个本地网页服务（默认 http://127.0.0.1:3100），每次打开都调用 `NOW/build.py` 当场生成 NOW 页，生成结果只放临时目录，另有各项目的御前看板，见它的 README。用它时：
+
+- 把 `NOW.md` 索引和 `今天.md`、`本月布局.md`、`已完成.md` 第 2 行的「看板」链接改为 `http://127.0.0.1:3100`；
+- `config.json` 的 `output` 改到不常看的位置（如 `备份/看板.html`，相对 `NOW/`），只在手动运行 `build.py` 时生成；
+- 不再需要 Stop hook。
 
 ## 稳定性约定
 

@@ -4,17 +4,30 @@
 
 用法：python3 NOW/build.py
       python3 NOW/build.py --if-changed   只在源文件比看板新时生成（供 Claude Code Stop hook 调用）
+      python3 build.py --now-dir <NOW 目录>  代码和数据分开放时指定数据目录（也可用环境变量 NOW_DATA_DIR）
 内容只改 Markdown；分类、配色和截止来源改 config.json；样式和布局改 template.html。
 """
 import datetime as dt
 import html
 import json
+import os
 import re
 import sys
 from pathlib import Path
 from urllib.parse import quote
 
-HERE = Path(__file__).resolve().parent
+CODE = Path(__file__).resolve().parent  # 本脚本和 template.html 所在目录
+
+
+def _data_dir():
+    """NOW 数据目录：--now-dir、环境变量 NOW_DATA_DIR，都没有时与代码同目录。"""
+    if "--now-dir" in sys.argv[:-1]:
+        return Path(sys.argv[sys.argv.index("--now-dir") + 1]).expanduser().resolve()
+    env = os.environ.get("NOW_DATA_DIR")
+    return Path(env).expanduser().resolve() if env else CODE
+
+
+HERE = _data_dir()
 CONFIG = HERE / "config.json"
 
 
@@ -43,7 +56,7 @@ DONE_SHOW = CFG.get("done_show", 5)  # 看板上显示最近几条已完成
 DL = CFG["deadlines"]
 EXAMS_MD = _path(DL.get("file"))
 DL_GROUPS = DL.get("groups") or []  # 只显示这些分组（标题第一个词）；为空则全部显示
-TEMPLATE = HERE / "template.html"
+TEMPLATE = CODE / "template.html"
 OUT = _path(CFG.get("output"), HERE / "看板.html")  # 可在 config.json 用 output 指定生成位置
 
 # 关键词 → 分类配色键（顺序即优先级）：先「不计时」，再按 config 中分类的顺序
@@ -303,7 +316,8 @@ def main():
         "catNames": CAT_NAMES,
         "deadlineNote": DL.get("note", ""),
         "deadlineCat": category(DL.get("category", "")) if DL.get("category") else "other",
-        "buildCmd": "python3 " + str(Path(__file__).resolve()).replace(str(Path.home()), "~"),
+        "buildCmd": ("python3 " + str(Path(__file__).resolve())
+                     + ("" if HERE == CODE else f" --now-dir {HERE}")).replace(str(Path.home()), "~"),
         "sources": {
             "today": "file://" + quote(str(TODAY_MD)),
             "month": "file://" + quote(str(MONTH_MD)),

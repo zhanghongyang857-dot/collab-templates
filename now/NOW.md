@@ -11,7 +11,7 @@
 - [已完成](NOW/已完成.md)：完成的任务从下表移到这里
 - [截止](NOW/截止.md)：近期截止的来源（可在 `NOW/config.json` 改成别的文件）
 
-改了任何相关 Markdown 后运行 `python3 NOW/build.py`；配好 Claude Code 的 Stop hook 后会自动生成（见模板仓库 README）。
+改了任何相关 Markdown 后运行 `python3 NOW/build.py`；配好 Claude Code 的 Stop hook 后会自动生成。用常驻网页服务时把上面的看板链接换成网页地址，不再需要手动生成（见模板仓库 README）。
 
 ## 任务
 
