@@ -68,12 +68,12 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 
 | 命令 | 作用 |
 |---|---|
-| `small` / `large [目录] [-n 项目名]` | 新建；目录默认当前目录，项目名默认目录名 |
+| `small` / `large [目录] [-n 项目名] [--no-now]` | 新建；目录默认当前目录，项目名默认目录名。同时在 NOW 任务表加一行（状态进行中，分类、等级待填），已有本项目或加 `--no-now` 时不加 |
 | `upgrade [目录]` | 小版本在 `collab/` 补齐大版本文件，并打印剩余的手动迁移步骤 |
 | `protocol [目录]` | 用最新模板更新 `collab/协议.md`（只动这一个文件，保留「本项目补充」一节） |
 | `migrate [目录]` | v1 旧布局（根目录 `PROGRESS.md`、`协作/`）迁到 `collab/`：改写移动文件和项目内指向它们的链接、NOW 里的链接，更新入口说明；需要时用 `NOW_PATH` 指明 NOW 位置 |
-| `now [目录]` | 建立 NOW 总看板；目录默认 `~/Desktop` |
-| `now-update [目录]` | 用最新模板覆盖 `NOW/build.py` 和 `NOW/template.html`，不动数据和 `config.json` |
+| `now [目录]` | 建立 NOW 总看板；目录默认 `~/Desktop`。只建数据文件，生成代码留在本仓库 `now/NOW/` |
+| `now-update [目录]` | 旧版 NOW（目录里有 `build.py`）用最新模板覆盖 `build.py` 和 `template.html`；新版 NOW 没有代码，无需更新 |
 | `team [班子目录]` | 从示例建立你的班子配置 `班子.json`，默认 `~/.collab-team` |
 | `team-sync [目录] [--all] [--force]` | 按班子配置重新生成 `collab/成员.md`；默认只刷当前项目，`--all` 刷 NOW 任务表里的全部项目；不是生成的文件要加 `--force`（原文件备份为 `成员.md.bak`） |
 
@@ -113,10 +113,10 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
     已完成.md        完成的任务移到这里
     截止.md          近期截止（可在 config.json 换成别的文件）
     config.json      分类与配色、截止来源
-    build.py         生成脚本
-    template.html    页面样式与布局
     看板.html        生成结果，不要手改
 ```
+
+生成代码（`build.py`、`template.html`）不复制进来，用本仓库 `now/NOW/` 那一份：`python3 <仓库>/templates/now/NOW/build.py --now-dir <目录>/NOW`，`NOW.md` 里会写好这条命令。改样式改仓库里的 `template.html`。
 
 **数据只在 Markdown 里，HTML 每次从 Markdown 整个重新生成**，所以不存在两份内容需要同步。看板有两个标签页：
 
@@ -157,12 +157,12 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 ```json
 "hooks": {
   "Stop": [{ "hooks": [{ "type": "command",
-    "command": "python3 ~/Desktop/NOW/build.py --if-changed >/dev/null 2>&1 || true",
+    "command": "python3 <仓库>/templates/now/NOW/build.py --now-dir ~/Desktop/NOW --if-changed >/dev/null 2>&1 || true",
     "timeout": 20 }] }]
 }
 ```
 
-只在 Claude Code 里生效；在其他应用或手动改了文件，下一次 Claude 回答结束时补上，或手动运行 `python3 ~/Desktop/NOW/build.py`。
+只在 Claude Code 里生效；在其他应用或手动改了文件，下一次 Claude 回答结束时补上，或手动运行 `NOW.md` 里写的生成命令。
 
 **常驻网页（推荐，替代静态文件和 hook）**：协作工具包的 `tools/board` 是一个本地网页服务（默认 http://127.0.0.1:3100），每次打开都调用 `NOW/build.py` 当场生成 NOW 页，生成结果只放临时目录，另有各项目的御前看板，见它的 README。用它时：
 
@@ -189,5 +189,5 @@ small/   AGENTS.md  .claude/CLAUDE.md
 large/   AGENTS.md  .claude/CLAUDE.md
          collab/ PROGRESS.md 日志.md 协议.md 成员.md 决议.md 经验.md 议题/_模板.md 目标/_模板.md 任务/_模板.md 归档/
 now/     NOW.md
-         NOW/ 今天.md 本月布局.md 已完成.md 截止.md config.json build.py template.html
+         NOW/ 今天.md 本月布局.md 已完成.md 截止.md config.json build.py template.html（代码不复制给用户）
 ```

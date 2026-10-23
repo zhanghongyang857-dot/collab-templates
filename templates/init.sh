@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # collab-templates 初始化脚本
 # 用法：
-#   init.sh small   [目标目录] [-n 项目名]   新建小版本
-#   init.sh large   [目标目录] [-n 项目名]   新建大版本
+#   init.sh small   [目标目录] [-n 项目名] [--no-now]   新建小版本，并在 NOW 任务表加一行（--no-now 不加）
+#   init.sh large   [目标目录] [-n 项目名] [--no-now]   新建大版本，同上
 #   init.sh upgrade [目标目录]               小版本升级为大版本（在 collab/ 补齐文件，不动已有文件）
 #   init.sh protocol [目标目录]              用最新模板更新 collab/协议.md（只此一个文件，保留「本项目补充」一节）
 #   init.sh migrate [目标目录]               v1 旧布局（根目录 PROGRESS.md、协作/）迁到 collab/，并改好链接
-#   init.sh now        [目录，默认 ~/Desktop]  建立 NOW 总看板（NOW.md + NOW/ 目录）
-#   init.sh now-update [目录，默认 ~/Desktop]  用最新模板覆盖 NOW/build.py 和 NOW/template.html（不动数据和配置）
+#   init.sh now        [目录，默认 ~/Desktop]  建立 NOW 总看板（NOW.md + NOW/ 数据目录；生成代码留在模板仓库）
+#   init.sh now-update [目录，默认 ~/Desktop]  旧版 NOW（目录里有 build.py）用最新模板覆盖代码；新版无需更新
 #   init.sh team       [班子目录，默认 ~/.collab-team]  从示例建立你的 班子.json
 #   init.sh team-sync  [目标目录] [--all] [--force]   按 班子.json 重新生成 collab/成员.md；--all 刷 NOW 任务表里的全部项目
 # 班子：有 ~/.collab-team/班子.json（或环境变量 COLLAB_TEAM 指定的目录）时，新建项目的 成员.md 按它生成。
@@ -17,12 +17,13 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"; shift || true
-DEST="."; NAME=""; ALL=0; FORCE=""
+DEST="."; NAME=""; ALL=0; FORCE=""; NO_NOW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -n) NAME="${2:?-n 需要项目名}"; shift 2 ;;
     --all) ALL=1; shift ;;
     --force) FORCE="--force"; shift ;;
+    --no-now) NO_NOW=1; shift ;;
     -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) DEST="$1"; shift ;;
   esac
@@ -58,7 +59,7 @@ NOW_FILE="${NOW_PATH:-$HOME/Desktop/NOW.md}"
 NOW_REL="$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$NOW_FILE" "$DEST/collab")"
 TODAY="$(date +%Y-%m-%d)"
 
-created=(); skipped=(); appended=()
+created=(); skipped=(); appended=(); notes=()
 
 # 复制单个文件；.md 做占位符替换
 copy_one() {  # $1 源文件  $2 目标文件
@@ -89,8 +90,42 @@ copy_tree() {  # $1 源目录  $2 只复制该子路径（可空）
   while IFS= read -r -d '' f; do
     local rel="${f#$base/}"
     case "$rel" in AGENTS.md|.claude/CLAUDE.md) continue ;; esac
+    case "$rel" in NOW/build.py|NOW/template.html) continue ;; esac  # NOW 只放数据，代码留在模板仓库
     copy_one "$f" "$DEST/$rel"
   done < <(find "$base/$sub" -type f -print0 | sort -z)
+}
+
+# NOW 任务表加一行，链接到本项目 collab/PROGRESS.md；已有链接或找不到 NOW 时跳过
+now_row() {
+  [ "$NO_NOW" = 0 ] || return 0
+  if [ ! -f "$NOW_FILE" ]; then
+    notes+=("没找到 NOW：$NOW_FILE，未加进 NOW 任务表（用 NOW_PATH 指明，或加 --no-now）"); return 0
+  fi
+  local r
+  r="$(python3 - "$NOW_FILE" "$DEST/collab/PROGRESS.md" "$NAME" <<'PY'
+import os, re, sys
+now, prog, name = sys.argv[1:]
+t = open(now, encoding="utf-8").read()
+base = os.path.dirname(os.path.abspath(now))
+for m in re.finditer(r"\]\(<?([^)>]+)>?\)", t):
+    if os.path.normpath(os.path.join(base, m.group(1))) == os.path.normpath(prog):
+        print("exists"); sys.exit()
+sec = re.search(r"(?m)^## 任务\s*$", t)
+head = re.compile(r"(?m)^\|[ \t]*任务[ \t]*\|.*\n\|[-| :]+\|[ \t]*\n")
+m = head.search(t, sec.end()) if sec else None
+if not m:
+    print("notable"); sys.exit()
+rel = os.path.relpath(prog, base)
+row = "| [%s](<%s>) |  |  | 进行中 |\n" % (name, rel)
+open(now, "w", encoding="utf-8").write(t[:m.end()] + row + t[m.end():])
+print("added")
+PY
+)"
+  case "$r" in
+    added) appended+=("NOW 任务表（$NOW_FILE；分类、等级待填）") ;;
+    exists) skipped+=("NOW 任务表（已有本项目）") ;;
+    *) notes+=("$NOW_FILE 里没找到「## 任务」表，未加行") ;;
+  esac
 }
 
 # AGENTS.md：不存在则创建，存在则追加。
@@ -126,7 +161,8 @@ case "$MODE" in
       python3 "$SRC/team.py" render "$TEAM_FILE" "$DEST/collab/成员.md" >/dev/null
       kept=(); for c in "${created[@]}"; do [ "$c" = "collab/成员.md" ] || kept+=("$c"); done
       created=("${kept[@]}" "collab/成员.md（按班子 $TEAM_FILE 生成）")
-    fi ;;
+    fi
+    now_row ;;
   upgrade)
     old_layout_hint
     [ -e "$DEST/collab/PROGRESS.md" ] || { echo "未找到 collab/PROGRESS.md：$DEST"; exit 1; }
@@ -296,9 +332,19 @@ PY
     ;;
   now)
     copy_tree "$SRC/now"
-    python3 "$DEST/NOW/build.py" >/dev/null && created+=("NOW/看板.html（已生成）") ;;
+    python3 - "$DEST/NOW.md" "$SRC/now/NOW/build.py" "$DEST/NOW" <<'PY'
+import os, sys
+p, build, data = sys.argv[1:]
+home = os.path.expanduser("~")
+short = lambda x: "~" + x[len(home):] if x.startswith(home + "/") else x
+t = open(p, encoding="utf-8").read()
+cmd = "python3 %s --now-dir %s" % (short(build), short(data))
+open(p, "w", encoding="utf-8").write(t.replace("`python3 NOW/build.py`", "`%s`" % cmd))
+PY
+    python3 "$SRC/now/NOW/build.py" --now-dir "$DEST/NOW" >/dev/null && created+=("NOW/看板.html（已生成）") ;;
   now-update)
     [ -d "$DEST/NOW" ] || { echo "未找到 NOW/：$DEST"; exit 1; }
+    if [ ! -e "$DEST/NOW/build.py" ]; then echo "NOW/ 里没有代码（新版 NOW 由模板仓库的 build.py 生成），无需更新"; exit 0; fi
     for f in build.py template.html; do cp "$SRC/now/NOW/$f" "$DEST/NOW/$f"; created+=("NOW/$f（已更新）"); done
     python3 "$DEST/NOW/build.py" >/dev/null && created+=("NOW/看板.html（已生成）") ;;
 esac
@@ -307,12 +353,14 @@ echo "目标：$DEST（$MODE）"
 [ ${#created[@]}  -eq 0 ] || printf '  新建  %s\n' "${created[@]}"
 [ ${#appended[@]} -eq 0 ] || printf '  追加  %s\n' "${appended[@]}"
 [ ${#skipped[@]}  -eq 0 ] || printf '  跳过（已存在）  %s\n' "${skipped[@]}"
+[ ${#notes[@]}    -eq 0 ] || printf '  注意  %s\n' "${notes[@]}"
 
 if [ "$MODE" = now ]; then cat <<MSG
 
 下一步：
   1. 改 NOW/config.json 里的分类（和 NOW.md 大方向的方向名对应）与截止来源
   2. 看板刷新二选一（见模板仓库 README「NOW 总看板」）：用常驻网页服务（推荐，打开即最新），或在 ~/.claude/settings.json 加 Stop hook 自动重生成 看板.html
+  3. 之后建项目用 NOW_PATH=$DEST/NOW.md init.sh small，项目会自动加进 NOW 任务表
 MSG
 fi
 
