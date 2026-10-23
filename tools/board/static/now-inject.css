@@ -1,4 +1,4 @@
-/* 只给 NOW 页加「看板」入口，不改 NOW 自身样式 */
+/* 只给 NOW 页加看板摘要和「文档」按钮，不改 NOW 自身样式 */
 .bd-chip {
   display: inline-block;
   margin-left: 6px;
@@ -26,3 +26,4 @@
   padding: 3px 10px;
 }
 .bd-chip.bd-warn { color: var(--amber, #c98a06); background: var(--amber-soft, #fdf4dc); }
+.bd-chip.bd-doc { color: var(--ink-3, #8c8e94); background: transparent; border: 1px solid var(--line, #e6e4df); line-height: 16px; }

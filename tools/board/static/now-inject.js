@@ -1,4 +1,4 @@
-// NOW 页增强：任务链接旁加「看板」入口；file:// 链接交给本机服务用默认应用打开；定时整页刷新拿最新内容。
+// NOW 页增强：有 collab/ 的任务标题改去项目看板，旁边留「文档」按钮打开 PROGRESS.md；file:// 链接交给本机服务用默认应用打开；定时整页刷新拿最新内容。
 (function () {
   let byProgress = {};
 
@@ -15,19 +15,30 @@
     openFile(a.getAttribute("href"));
   });
 
+  // 有 collab/ 的任务：标题改去项目看板，后面跟摘要和一个小的「文档」按钮打开 PROGRESS.md
   function addChips() {
     document.querySelectorAll('a[href^="file://"]').forEach((a) => {
       if (a.dataset.bd) return;
       a.dataset.bd = "1";
-      const path = decodeURIComponent(a.getAttribute("href").replace(/^file:\/\//, ""));
-      const p = byProgress[path];
+      const href = a.getAttribute("href");
+      const p = byProgress[decodeURIComponent(href.replace(/^file:\/\//, ""))];
       if (!p) return;
-      const chip = document.createElement("a");
-      chip.className = "bd-chip";
-      chip.href = "/p/" + p.id;
-      chip.textContent = p.summary ? "看板 · " + p.summary : "看板";
-      if (/受阻/.test(p.summary || "")) chip.classList.add("bd-warn");
-      a.after(chip);
+      a.href = "/p/" + p.id;
+      a.title = "打开项目看板";
+      if (p.summary) {
+        const sum = document.createElement("a");
+        sum.className = "bd-chip" + (/受阻/.test(p.summary) ? " bd-warn" : "");
+        sum.href = "/p/" + p.id;
+        sum.textContent = p.summary;
+        a.after(sum);
+      }
+      const doc = document.createElement("a");
+      doc.className = "bd-chip bd-doc";
+      doc.dataset.bd = "1";
+      doc.href = href;
+      doc.title = "用默认应用打开 PROGRESS.md";
+      doc.textContent = "文档";
+      (a.nextElementSibling && a.nextElementSibling.classList.contains("bd-chip") ? a.nextElementSibling : a).after(doc);
     });
   }
 
