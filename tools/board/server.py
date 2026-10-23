@@ -208,6 +208,7 @@ def project_data(p: Dict[str, Any]) -> Dict[str, Any]:
     done_line = next((l for l in task_lines if l.startswith("已完成")), "")
     decisions = [mod.inline(re.sub(r"^\s*-\s*", "", l.strip()), collab) for t in ("决议", "生效决议")
                  for l in mod.find_section(secs, t)[1] if re.match(r"\s*-?\s*D\d+", l)]
+    issues = collab_parse.load_issues(collab)
     archived = sum(1 for t in tasks if t["archived"])
     try:
         checked = collab_check.check(Path(p["root"]))
@@ -223,11 +224,38 @@ def project_data(p: Dict[str, Any]) -> Dict[str, Any]:
         "decisions": decisions,
         "doneLine": mod.inline(done_line, collab),
         "archived": archived,
+        "archivedCount": {"goals": sum(1 for g in goals if g["archived"]), "tasks": archived,
+                          "issues": sum(1 for i in issues if i["archived"])},
         "cards": [html_task(mod, t, collab) for t in tasks if not t["archived"]],
         "goals": [html_goal(mod, g, by_id, collab) for g in goals if not g["archived"]],
-        "issues": [html_issue(mod, i, collab) for i in collab_parse.load_issues(collab) if not i["archived"]],
+        "issues": [html_issue(mod, i, collab) for i in issues if not i["archived"]],
         "runs": parse_runs(collab),
         "check": checked,
+        "generated": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+
+
+def archive_data(p: Dict[str, Any]) -> Dict[str, Any]:
+    """归档页：只有归档的目标、任务、议题和它们的派活记录；打开时加载一次，不轮询。"""
+    mod = load_build()
+    progress = Path(p["progress"])
+    collab = progress.parent
+    text = collab_parse.strip_comments(progress.read_text(encoding="utf-8"))
+    name = next((l[2:].strip() for l in text.splitlines() if l.startswith("# ")), p["name"])
+    tasks = collab_parse.load_tasks(collab)
+    goals = collab_parse.load_goals(collab, tasks)
+    by_id = {t["id"]: t for t in tasks}
+    issues = [i for i in collab_parse.load_issues(collab) if i["archived"]]
+    cards = [t for t in tasks if t["archived"]]
+    ids = {t["id"] for t in cards} | {i["id"] for i in issues}
+    return {
+        "id": p["id"], "name": name, "root": p["root"], "archive": True,
+        "progressHref": "file://" + quote(str(progress)),
+        "meta": {}, "pending": [], "decisions": [],
+        "cards": [html_task(mod, t, collab) for t in cards],
+        "goals": [html_goal(mod, g, by_id, collab) for g in goals if g["archived"]],
+        "issues": [html_issue(mod, i, collab) for i in issues],
+        "runs": [r for r in parse_runs(collab) if r.get("task") in ids],
         "generated": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
     }
 
@@ -264,11 +292,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, now_html().encode("utf-8"), "text/html", csp=False)
             if path == "/api/projects":
                 return self.json(discover())
-            m = re.fullmatch(r"/api/p/([0-9a-f]{8})", path)
+            m = re.fullmatch(r"/api/p/([0-9a-f]{8})(/archive)?", path)
             if m:
                 p = next((x for x in discover() if x["id"] == m.group(1)), None)
-                return self.json(project_data(p)) if p else self.json({"error": "找不到项目"}, 404)
-            if re.fullmatch(r"/p/[0-9a-f]{8}", path):
+                if not p:
+                    return self.json({"error": "找不到项目"}, 404)
+                return self.json(archive_data(p) if m.group(2) else project_data(p))
+            if re.fullmatch(r"/p/[0-9a-f]{8}(/archive)?", path):
                 return self.send(200, (STATIC / "project.html").read_bytes(), "text/html")
             m = re.fullmatch(r"/static/([\w.-]+)", path)
             if m and m.group(1) in STATIC_FILES:

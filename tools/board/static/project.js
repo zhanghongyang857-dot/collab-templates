@@ -1,7 +1,9 @@
 // 御前看板：每 5 秒拉一次项目数据并重绘；展开状态保留。
+// /p/<id>/archive 是归档页：只看归档的目标、任务、议题，打开时加载一次，不轮询。
 // 服务端给的 *Html 字段（来自 Markdown，已转义）用 innerHTML，其余一律转义。
 (function () {
-  const id = location.pathname.split("/").pop();
+  const [, id, archiveSeg] = location.pathname.match(/^\/p\/([0-9a-f]+)(\/archive)?/) || [];
+  const ARCHIVE = !!archiveSeg;
   const app = document.getElementById("app");
   const COLS = [
     {name: "待开始", match: (s) => s.startsWith("已交接")},
@@ -11,7 +13,7 @@
     {name: "通过", match: (s) => s.startsWith("通过")},
   ];
   const STALE_MIN = 10;
-  let openTask = null;
+  let openTask = ARCHIVE ? (location.hash.match(/^#((?:G\d+-)?T\d+)$/) || [])[1] || null : null;
   let openGoal = null;
   let openIssue = null;
   let recTab = "runs";
@@ -231,7 +233,7 @@
         const lane = /验收/.test(s.seat) && !LEAD.test(s.who) && !/总管/.test(s.who) ? "check" : /汇报|总管/.test(s.seat + s.who) ? "lead" : "exec";
         if (lane === "check") hasCheck = true;
         const prevDone = g.stages.filter((x) => x.no < s.no).every((x) => x.status === "通过");
-        const n = add({lane, sub: 0, row: put(lane, 0, start), label: `${circ(s.no)} ${s.seat}`, cls: prevDone && approved ? "now" : "todo", stage: s,
+        const n = add({lane, sub: 0, row: put(lane, 0, start), label: `${circ(s.no)} ${s.seat}`, cls: s.status === "通过" ? "ok" : prevDone && approved ? "now" : "todo", stage: s,
           info: `阶段 ${circ(s.no)}「${s.seat}」· ${s.who || "—"}：${strip(s.output)}（还没有任务）`});
         ends.forEach((e) => edges.push([e, n]));
         ends = [n]; row = nodes[n].row + 1; return;
@@ -328,7 +330,8 @@
     if (fields.length) b += `<div class="fields">${fields.map((f) => `<span class="k">${esc(f.k)}</span><span>${f.v}</span>`).join("")}</div>`;
     b += `<h4>流程</h4><div class="scroll"><table><thead><tr><th>阶段</th><th>席位</th><th>人选</th><th>产出</th><th>通过条件</th><th>子任务</th><th>状态</th></tr></thead><tbody>${g.stages.map((s) => `<tr>
       <td>${circ(s.no)}</td><td>${esc(s.seat)}</td><td>${esc(s.who)}</td><td>${s.output}</td><td>${s.cond}</td>
-      <td>${s.taskInfo.map((t) => `<span class="tlink" data-task="${t.archived ? "" : esc(t.id)}">${esc(t.id)} ${statusPill(t.state || "—")}</span>`).join(" ") || "—"}${s.missing.length ? ` <span class="pill bad">找不到 ${esc(s.missing.join("、"))}</span>` : ""}</td>
+      <td>${s.taskInfo.map((t) => t.archived && !ARCHIVE ? `<a class="tlink" href="/p/${esc(id)}/archive#${esc(t.id)}">${esc(t.id)} ${statusPill(t.state || "—")}</a>`
+        : `<span class="tlink" data-task="${esc(t.id)}">${esc(t.id)} ${statusPill(t.state || "—")}</span>`).join(" ") || "—"}${s.missing.length ? ` <span class="pill bad">找不到 ${esc(s.missing.join("、"))}</span>` : ""}</td>
       <td>${statusPill(s.status)}</td></tr>`).join("")}</tbody></table></div>`;
     if (devs.length) b += `<h4>偏离记录</h4><ul class="plain">${devs.map((r) => `<li><b>${esc(r.run)}</b> ${esc(r.member)} 坐「${esc(r.seat)}」：${esc(r.override)}<div class="note">${(r.deviations || []).map(esc).join("；")}</div></li>`).join("")}</ul>`;
     return b + "</div>";
@@ -507,19 +510,74 @@
     return card(`<span class="tabs">${tabs}</span>`, body, {meta: recTab === "runs" ? (selGoal ? scopeMeta() : past.length ? "点一行看启动语和回复" : "") : ""});
   }
 
+  // ---------- 归档页 ----------
+  function doneDate(x) {
+    const row = (x.flow || []).filter((r) => /^(通过|完成)/.test(strip(r["状态"] || ""))).pop();
+    return row ? strip(row["日期"] || "") : "";
+  }
+  function renderArchiveGoals(d) {
+    if (!d.goals.length) return card("归档目标", '<div class="empty">没有归档的目标</div>');
+    const goals = d.goals.slice().sort((a, b) => b.id.localeCompare(a.id, undefined, {numeric: true}));
+    const focus = goals.find((g) => g.id === selGoal) || goals[0];
+    const rows = goals.map((g) => {
+      const runs = goalRuns(d, g);
+      return `<div class="grow ${g.id === selGoal ? "on" : g.id === focus.id ? "auto" : ""}" data-goal="${esc(g.id)}">
+        <div class="gname"><span class="tid">${esc(g.id)}</span><span class="tt">${esc(g.title)}</span>${statusPill(g.state || "—")}</div>
+        <div class="gprog">${stageDots(g)}</div>
+        <div class="gnow">${g.head["批准"] ? "批准：" + esc(g.head["批准"]) : ""}</div>
+        <div class="galert"></div>
+        <div class="gcost">${runs.length ? `派活 ${runs.length} · ${tok(sumTok(runs)).split(" ·")[0]}` : "未派活"}</div>
+      </div>`;
+    }).join("");
+    const body = `<div class="glist">${rows}</div><div class="gfocus"><div class="gfh"><b>${esc(focus.id)} ${esc(focus.title)}</b><span class="meta">流程泳道 · 已归档</span>
+      <span class="tlink gdet" data-gdet="${esc(focus.id)}">${openGoal === focus.id ? "收起框架" : "看框架和偏离"}</span></div>
+      ${openGoal === focus.id ? renderGoalDetail(focus, goalRuns(d, focus).filter((r) => r.override)) : ""}${renderLanes(d, focus)}</div>`;
+    return card("归档目标", body, {meta: `${goals.length} 个 · 点一行看它的流程`});
+  }
+  function renderArchiveTasks(d) {
+    if (!d.cards.length) return card("归档任务", '<div class="empty">没有归档的任务</div>');
+    const runsBy = {};
+    d.runs.forEach((r) => { (runsBy[r.task] = runsBy[r.task] || []).push(r); });
+    const groups = {};
+    d.cards.forEach((t) => { const k = t.goal || ""; (groups[k] = groups[k] || []).push(t); });
+    const keys = Object.keys(groups).sort((a, b) => (a === "") - (b === "") || b.localeCompare(a, undefined, {numeric: true}));
+    const html = keys.map((k) => {
+      const g = d.goals.find((x) => x.id === k);
+      const title = k ? `${esc(k)}${g ? " " + esc(g.title) : ""}` : "零散任务";
+      return `<div class="tgroup"><h3>${title}<span class="n">${groups[k].length}</span></h3>${groups[k].map((t) => {
+        const rs = runsBy[t.id] || [];
+        const dd = doneDate(t);
+        return `<div class="trow task ${openTask === t.id ? "open" : ""}" data-task="${esc(t.id)}">
+          <span class="tid">${esc(t.id)}</span><span class="tt">${esc(t.title)}</span>
+          <span class="tw">${esc(t.head["执行"] || "—")} → ${esc(t.head["验收"] || "—")}${dd ? ` · ${esc(dd)} 通过` : ""}</span>${statusPill(t.state || "—")}
+          <span class="tn">${rs.length ? `派活 ${rs.length}` : ""}</span></div>` + (openTask === t.id ? renderTaskDetail(t, rs) : "");
+      }).join("")}</div>`;
+    }).join("");
+    return card("归档任务", `<div class="tlist">${html}</div>`, {meta: `${d.cards.length} 张 · 点一行看流转和派活记录`});
+  }
+  function renderArchive(d) {
+    const n = d.goals.length + d.cards.length + d.issues.length;
+    const body = n ? `${renderArchiveGoals(d)}${renderIssues(d)}${renderArchiveTasks(d)}` : '<div class="empty">这个项目还没有归档的目标、任务或议题</div>';
+    return `<div class="strip"><span class="si">归档目标 <b>${d.goals.length}</b></span><span class="si">任务 <b>${d.cards.length}</b></span><span class="si">议题 <b>${d.issues.length}</b></span><span class="si">派活 <b>${d.runs.length}</b> 次 · token <b>${tok(sumTok(d.runs)).split(" ·")[0]}</b></span></div>${body}`;
+  }
+
   function render() {
     const d = data;
-    document.title = d.name + " · 御前看板";
-    document.getElementById("name").textContent = d.name;
+    document.title = d.name + (ARCHIVE ? " · 归档" : " · 御前看板");
+    document.getElementById("name").textContent = d.name + (ARCHIVE ? " · 归档" : "");
     const m = d.meta;
-    document.getElementById("meta").innerHTML = [m["状态"], m["截止"] && "截止 " + m["截止"], `<a href="${esc(d.progressHref)}">PROGRESS.md</a>`]
+    const ac = d.archivedCount || {};
+    const an = (ac.goals || 0) + (ac.tasks || 0) + (ac.issues || 0);
+    const alink = !ARCHIVE && an ? `<a href="/p/${esc(id)}/archive">已归档 ${[ac.goals && ac.goals + " 个目标", ac.tasks && ac.tasks + " 张任务", ac.issues && ac.issues + " 个议题"].filter(Boolean).join("、")} →</a>` : "";
+    document.getElementById("meta").innerHTML = [m["状态"], m["截止"] && "截止 " + m["截止"], `<a href="${esc(d.progressHref)}">PROGRESS.md</a>`, alink]
       .filter(Boolean).map((x) => (x.startsWith("<a") ? x : esc(x))).join(" · ");
+    if (ARCHIVE) { app.classList.add("archive"); app.innerHTML = renderArchive(d); return; }
     app.innerHTML = `${renderStrip(d)}${renderCheck(d)}<div class="row">${renderPending(d)}${renderNow(d)}</div>${renderRunning(d)}${renderGoals(d)}${renderIssues(d)}${renderBoard(d)}${renderRecords(d)}`;
   }
 
   async function load() {
     try {
-      const r = await fetch("/api/p/" + id, {cache: "no-store"});
+      const r = await fetch("/api/p/" + id + (ARCHIVE ? "/archive" : ""), {cache: "no-store"});
       const j = await r.json();
       if (j.error) throw new Error(j.error);
       const sig = JSON.stringify({...j, generated: 0});
@@ -527,7 +585,8 @@
       data = j;
       if (sig !== lastSig || live) render();
       lastSig = sig;
-      document.getElementById("tick").textContent = "每 5 秒刷新 · " + new Date().toLocaleTimeString("zh-CN", {hour12: false});
+      const now = new Date().toLocaleTimeString("zh-CN", {hour12: false});
+      document.getElementById("tick").textContent = ARCHIVE ? "打开时加载 · " + now + " · 刷新页面重新读取" : "每 5 秒刷新 · " + now;
     } catch (e) {
       document.getElementById("tick").textContent = "刷新失败：" + e.message;
     }
@@ -597,6 +656,11 @@
   let rt = null;
   window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => data && render(), 200); });
 
-  load();
-  setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
+  if (ARCHIVE) {
+    const back = document.querySelector(".back");
+    back.href = "/p/" + id;
+    back.textContent = "← 项目看板";
+  }
+  load().then(() => { if (ARCHIVE && openTask) document.querySelector(".task.open")?.scrollIntoView({block: "center"}); });
+  if (!ARCHIVE) setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
 })();

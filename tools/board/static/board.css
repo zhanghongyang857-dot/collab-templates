@@ -239,3 +239,6 @@ table.runs tr.dayrow span { font-size: 12px; color: var(--ink-3); }
 .checks li.e::before { content: "✗"; color: var(--red); }
 .checks li.w::before { content: "!"; color: var(--amber); }
 .checks .loc { color: var(--ink-3); margin-right: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+/* 归档页：泳道降低饱和度，和进行中的项目页区分 */
+.archive .lanes { filter: saturate(.55); }
