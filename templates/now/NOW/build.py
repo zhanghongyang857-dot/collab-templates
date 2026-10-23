@@ -177,7 +177,7 @@ def table_dicts(lines):
 
 
 def placeholder(t):
-    t = re.sub(r"（[^（）]*）$", "", t.strip())  # 去掉结尾的来源注记，如“待填（Pam）”
+    t = re.sub(r"（[^（）]*）$", "", t.strip())  # 去掉结尾的来源注记，如“待填（日历）”
     return not t or (t.startswith("<") and t.endswith(">")) or t in ("待填", "…")
 
 

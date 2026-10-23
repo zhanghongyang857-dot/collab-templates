@@ -390,7 +390,7 @@ function render() {
   };
   const quizzes = upcoming.filter(d => !d.final), finals = upcoming.filter(d => d.final);
   let dh = `<div class="card-head"><h2>近期截止</h2><span class="meta">${DATA.sources.exams ? `<a href="${DATA.sources.exams}">${DATA.deadlineNote || "截止来源"}</a>` : "未设置截止来源"}</span></div>`;
-  dh += quizzes.length ? quizzes.map(row).join("") : `<div class="empty">没有未到期的 Quiz 或作业</div>`;
+  dh += quizzes.length ? quizzes.map(row).join("") : `<div class="empty">没有未到期的截止事项</div>`;
   if (finals.length) dh += `<div class="finals-head">期末</div><div class="finals">${finals.map(row).join("")}</div>`;
   $("deadlines").innerHTML = dh;
 

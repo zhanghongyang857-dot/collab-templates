@@ -1,0 +1,28 @@
+/* 只给 NOW 页加「看板」入口，不改 NOW 自身样式 */
+.bd-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  vertical-align: 1px;
+  color: var(--accent, #2f5bea);
+  background: var(--accent-soft, #eaf0ff);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.bd-chip:hover { text-decoration: underline; }
+.bd-live {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  z-index: 50;
+  font-size: 12px;
+  color: var(--ink-3, #8c8e94);
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #e6e4df);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.bd-chip.bd-warn { color: var(--amber, #c98a06); background: var(--amber-soft, #fdf4dc); }

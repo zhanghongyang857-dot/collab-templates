@@ -1,0 +1,21 @@
+{
+  "_说明": "后备：没有班子配置（~/.collab-team/班子.json）时才用这里。成员的命令模板。{prompt} 启动语，{session} 会话 ID，{last} 最终回复文件。改权限或模型就改这里；aliases 是在任务卡和流程表「人选」里认这个成员用的名字（不分大小写）；新增成员要在 dispatch.py 的 PARSERS 里有对应的事件解析。",
+  "codex": {
+    "aliases": ["codex"],
+    "parser": "codex",
+    "start": ["codex", "exec", "--json", "--skip-git-repo-check", "-s", "workspace-write", "-o", "{last}", "{prompt}"],
+    "resume": ["codex", "exec", "resume", "--json", "--skip-git-repo-check", "-c", "sandbox_mode=\"workspace-write\"", "-o", "{last}", "{session}", "{prompt}"]
+  },
+  "deepseek": {
+    "aliases": ["deepseek", "dsh"],
+    "parser": "dsh",
+    "start": ["dsh", "headless", "--json", "{prompt}"],
+    "resume": ["dsh", "headless", "--json", "--session-id", "{session}", "{prompt}"]
+  },
+  "claude": {
+    "aliases": ["claude"],
+    "parser": "claude",
+    "start": ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "{prompt}"],
+    "resume": ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--resume", "{session}", "{prompt}"]
+  }
+}

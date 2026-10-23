@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 会话看板</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="会话列表">
+      <header class="brand">
+        <div class="brand-mark" aria-hidden="true">C</div>
+        <div class="brand-text">
+          <h1>Codex 会话</h1>
+          <p id="home-label" title="">只读看板</p>
+        </div>
+      </header>
+
+      <div class="search-box">
+        <input id="search" type="search" placeholder="搜索标题或工作目录…" autocomplete="off" spellcheck="false" aria-label="搜索标题或工作目录">
+        <kbd>/</kbd>
+      </div>
+
+      <div class="filter-block">
+        <div class="chips" id="source-chips" role="group" aria-label="来源筛选">
+          <button type="button" class="chip active" data-source="all" aria-pressed="true">全部</button>
+          <button type="button" class="chip" data-source="exec" aria-pressed="false">命令行</button>
+          <button type="button" class="chip" data-source="vscode" aria-pressed="false">桌面版</button>
+          <button type="button" class="chip" data-source="other" aria-pressed="false">其他</button>
+        </div>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="show-archived"><span>已归档</span></label>
+          <label class="toggle"><input type="checkbox" id="show-subagents"><span>子 agent</span></label>
+        </div>
+      </div>
+
+      <div class="list-meta">
+        <span id="list-count">载入中…</span>
+        <button type="button" id="refresh" class="icon-btn" title="刷新列表" aria-label="刷新列表">↻</button>
+      </div>
+      <div id="session-list" class="session-list"></div>
+    </aside>
+
+    <main class="detail" id="detail" aria-live="polite">
+      <div class="empty-state">
+        <div class="empty-icon" aria-hidden="true">⌘</div>
+        <h2>选择一个会话</h2>
+        <p>从左侧打开 Codex 命令行或桌面版会话，按“系统 / 用户 / 上下文 / 助手 / 思考 / 工具”查看完整轨迹。</p>
+        <p class="empty-hint">数据只读，不会修改 <code>~/.codex</code> 里的任何文件。</p>
+      </div>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

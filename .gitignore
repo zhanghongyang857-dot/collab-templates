@@ -1,0 +1,12 @@
+# 私人内容：试运行记录、私人设计文档、本机开发说明
+private/
+/AGENTS.md
+/.claude/
+
+# 编译产物与缓存
+tools/board/build/
+__pycache__/
+*.pyc
+
+# 系统文件
+.DS_Store
