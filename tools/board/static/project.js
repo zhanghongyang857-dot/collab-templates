@@ -89,6 +89,17 @@
       <ul class="popts">${list}</ul>${extra}${check}</div>`;
   }
 
+  // 校验结果（tools/check.py）：错误会挡住派活和 Claude 的每轮结束，提醒只显示
+  function renderCheck(d) {
+    const items = d.check || [];
+    if (!items.length) return "";
+    const errs = items.filter((x) => x.level === "error"), warns = items.filter((x) => x.level !== "error");
+    const li = (x) => `<li class="${x.level === "error" ? "e" : "w"}"><span class="loc">${esc(x.file)}${x.line ? ":" + x.line : ""}</span>${esc(x.msg)}</li>`;
+    const title = errs.length ? `校验：${errs.length} 个错误${warns.length ? `，${warns.length} 个提醒` : ""}` : `校验：${warns.length} 个提醒`;
+    const note = errs.length ? '<div class="note">有错误时派活脚本不派活，Claude 每轮结束会被要求先改好。</div>' : "";
+    return card(title, `<ul class="checks">${errs.concat(warns).map(li).join("")}</ul>${note}`, {cls: errs.length ? "check-bad" : "alert"});
+  }
+
   function renderPending(d) {
     const body = d.pending.length ? d.pending.map(pendingCard).join("") : `<div class="empty">没有需要你拍板的事</div>`;
     return card("待你决定", body, {cls: "pending", meta: d.pending.length ? d.pending.length + " 项" : ""});
@@ -163,7 +174,10 @@
   function renderGoals(d) {
     const goals = activeGoals(d);
     const done = d.goals.filter((g) => /^完成/.test(g.state)).length;
-    if (!goals.length) return done ? card("目标", `<div class="empty">已完成 ${done} 个目标，没有在推进的</div>`) : "";
+    if (!goals.length) {
+      if (done) return card("目标", `<div class="empty">已完成 ${done} 个目标，没有在推进的</div>`);
+      return d.cards.length ? card("目标", '<div class="empty">还没有目标卡，所以没有流程图。流程图来自目标卡的「流程」表：先建 G00x 目标卡（待批准），总裁批准后再派 G00x-Tn。</div>') : "";
+    }
     const focus = goals.find((g) => g.id === selGoal) || goals[0];
     const rows = goals.map((g) => {
       const due = g.head["截止"] && !/^[—\-\s]*$/.test(g.head["截止"]) ? g.head["截止"] : "";
@@ -500,7 +514,7 @@
     const m = d.meta;
     document.getElementById("meta").innerHTML = [m["状态"], m["截止"] && "截止 " + m["截止"], `<a href="${esc(d.progressHref)}">PROGRESS.md</a>`]
       .filter(Boolean).map((x) => (x.startsWith("<a") ? x : esc(x))).join(" · ");
-    app.innerHTML = `${renderStrip(d)}<div class="row">${renderPending(d)}${renderNow(d)}</div>${renderRunning(d)}${renderGoals(d)}${renderIssues(d)}${renderBoard(d)}${renderRecords(d)}`;
+    app.innerHTML = `${renderStrip(d)}${renderCheck(d)}<div class="row">${renderPending(d)}${renderNow(d)}</div>${renderRunning(d)}${renderGoals(d)}${renderIssues(d)}${renderBoard(d)}${renderRecords(d)}`;
   }
 
   async function load() {

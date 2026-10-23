@@ -26,6 +26,7 @@ from urllib.parse import quote, unquote, urlparse
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import collab_parse  # noqa: E402  与派活脚本共用的任务卡、目标卡解析
+import check as collab_check  # noqa: E402  collab/ 校验，与派活脚本、Stop hook 共用
 STATIC = HERE / "static"
 STATIC_FILES = {"board.css": "text/css", "project.js": "text/javascript", "project.html": "text/html",
                 "now-inject.css": "text/css", "now-inject.js": "text/javascript"}
@@ -208,6 +209,10 @@ def project_data(p: Dict[str, Any]) -> Dict[str, Any]:
     decisions = [mod.inline(re.sub(r"^\s*-\s*", "", l.strip()), collab) for t in ("决议", "生效决议")
                  for l in mod.find_section(secs, t)[1] if re.match(r"\s*-?\s*D\d+", l)]
     archived = sum(1 for t in tasks if t["archived"])
+    try:
+        checked = collab_check.check(Path(p["root"]))
+    except Exception as e:  # 校验器出错不影响看板
+        checked = [{"level": "warn", "file": "", "line": None, "msg": f"校验器出错：{e}"}]
     return {
         "id": p["id"], "name": name, "root": p["root"],
         "progressHref": "file://" + quote(str(progress)),
@@ -222,6 +227,7 @@ def project_data(p: Dict[str, Any]) -> Dict[str, Any]:
         "goals": [html_goal(mod, g, by_id, collab) for g in goals if not g["archived"]],
         "issues": [html_issue(mod, i, collab) for i in collab_parse.load_issues(collab) if not i["archived"]],
         "runs": parse_runs(collab),
+        "check": checked,
         "generated": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
     }
 

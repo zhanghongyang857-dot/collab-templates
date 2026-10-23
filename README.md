@@ -13,6 +13,7 @@ templates/             协作模板：small / large 项目模板、NOW 总看板
 tools/board            看板网页服务：NOW 页和各项目御前看板
 tools/dispatch         派活脚本：派活、续接、停止、按流程检查、朝会、写运行记录
 tools/collab_parse.py  任务卡、目标卡解析（派活脚本和看板共用）
+tools/check.py         collab/ 校验：派活前、Claude 每轮结束（Stop hook）、看板顶部都用它
 tools/codex-viewer     Codex 会话只读看板
 docs/                  需求、班子设计与子员工调用说明
 ```

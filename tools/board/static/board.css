@@ -229,3 +229,13 @@ details.more summary { cursor: pointer; font-size: 12.5px; color: var(--ink-3); 
 table.runs tr.dayrow td { background: var(--soft); border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: normal; }
 table.runs tr.dayrow b { font-size: 12.5px; margin-right: 12px; }
 table.runs tr.dayrow span { font-size: 12px; color: var(--ink-3); }
+
+/* 校验结果 */
+.card.check-bad { border-color: var(--red); background: linear-gradient(var(--red-soft), var(--card) 70%); margin-bottom: 16px; }
+.card.alert:has(.checks) { margin-bottom: 16px; }
+.checks { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.checks li { padding: 4px 0 4px 18px; position: relative; line-height: 1.5; }
+.checks li::before { position: absolute; left: 0; font-weight: 700; }
+.checks li.e::before { content: "✗"; color: var(--red); }
+.checks li.w::before { content: "!"; color: var(--amber); }
+.checks .loc { color: var(--ink-3); margin-right: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }

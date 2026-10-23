@@ -10,6 +10,7 @@
 #   init.sh now-update [目录，默认 ~/Desktop]  旧版 NOW（目录里有 build.py）用最新模板覆盖代码；新版无需更新
 #   init.sh team       [班子目录，默认 ~/.collab-team]  从示例建立你的 班子.json
 #   init.sh team-sync  [目标目录] [--all] [--force]   按 班子.json 重新生成 collab/成员.md；--all 刷 NOW 任务表里的全部项目
+#   init.sh hook       [目标目录]   给已有项目装 Claude Code Stop hook：每轮结束校验 collab/，有错交回 Claude 修（新建项目自动装）
 # 班子：有 ~/.collab-team/班子.json（或环境变量 COLLAB_TEAM 指定的目录）时，新建项目的 成员.md 按它生成。
 # 布局：协作文件全部在 collab/ 下；项目根目录只放 AGENTS.md，Claude Code 通过 .claude/CLAUDE.md 导入它。
 # 原则：除 protocol、now-update 外从不覆盖已有文件；已有 AGENTS.md / CLAUDE.md 只追加入口说明。
@@ -29,7 +30,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-case "$MODE" in small|large|upgrade|protocol|migrate|now|now-update|team|team-sync) ;; *) sed -n '2,16p' "$0"; exit 1 ;; esac
+case "$MODE" in small|large|upgrade|protocol|migrate|now|now-update|team|team-sync|hook) ;; *) sed -n '2,16p' "$0"; exit 1 ;; esac
 if [ "$MODE" = now ] || [ "$MODE" = now-update ]; then [ "$DEST" != "." ] || DEST="$HOME/Desktop"; fi
 TEAM_DIR="${COLLAB_TEAM:-$HOME/.collab-team}"
 TEAM_FILE="$TEAM_DIR/班子.json"
@@ -128,6 +129,43 @@ PY
   esac
 }
 
+# .claude/settings.json 里加 Stop hook：每轮结束运行 tools/check.py --hook；已有同一条时不重复加
+CHECK_PY="$(cd "$SRC/.." && pwd)/tools/check.py"
+hook_install() {
+  local r
+  r="$(python3 - "$DEST/.claude/settings.json" "$CHECK_PY" <<'PY'
+import json, os, sys
+path, check = sys.argv[1:]
+cmd = "python3 '%s' --hook" % check
+cfg = {}
+if os.path.exists(path):
+    try:
+        cfg = json.load(open(path, encoding="utf-8"))
+    except ValueError:
+        print("bad"); sys.exit()
+stop = cfg.setdefault("hooks", {}).setdefault("Stop", [])
+for grp in stop:
+    for h in grp.get("hooks", []):
+        if "check.py" in h.get("command", "") and "--hook" in h.get("command", ""):
+            if h["command"] == cmd:
+                print("exists"); sys.exit()
+            h["command"] = cmd
+            json.dump(cfg, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+            print("updated"); sys.exit()
+stop.append({"hooks": [{"type": "command", "command": cmd, "timeout": 30}]})
+os.makedirs(os.path.dirname(path), exist_ok=True)
+json.dump(cfg, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+print("added")
+PY
+)"
+  case "$r" in
+    added) created+=(".claude/settings.json（Stop hook：每轮结束校验 collab/）") ;;
+    updated) appended+=(".claude/settings.json（Stop hook 路径已更新）") ;;
+    exists) skipped+=(".claude/settings.json 的 Stop hook") ;;
+    *) notes+=(".claude/settings.json 不是合法 JSON，没装 Stop hook，请手动修好后运行 init.sh hook") ;;
+  esac
+}
+
 # AGENTS.md：不存在则创建，存在则追加。
 # Claude Code：根目录已有 CLAUDE.md 就在其中导入 @AGENTS.md，否则用 .claude/CLAUDE.md，保持根目录干净。
 pointer() {  # $1 版本目录
@@ -162,7 +200,11 @@ case "$MODE" in
       kept=(); for c in "${created[@]}"; do [ "$c" = "collab/成员.md" ] || kept+=("$c"); done
       created=("${kept[@]}" "collab/成员.md（按班子 $TEAM_FILE 生成）")
     fi
+    hook_install
     now_row ;;
+  hook)
+    [ -e "$DEST/collab/PROGRESS.md" ] || { echo "未找到 collab/PROGRESS.md：$DEST"; exit 1; }
+    hook_install ;;
   upgrade)
     old_layout_hint
     [ -e "$DEST/collab/PROGRESS.md" ] || { echo "未找到 collab/PROGRESS.md：$DEST"; exit 1; }

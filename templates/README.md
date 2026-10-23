@@ -75,6 +75,7 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | `now [目录]` | 建立 NOW 总看板；目录默认 `~/Desktop`。只建数据文件，生成代码留在本仓库 `now/NOW/` |
 | `now-update [目录]` | 旧版 NOW（目录里有 `build.py`）用最新模板覆盖 `build.py` 和 `template.html`；新版 NOW 没有代码，无需更新 |
 | `team [班子目录]` | 从示例建立你的班子配置 `班子.json`，默认 `~/.collab-team` |
+| `hook [目录]` | 给已有项目装 Claude Code Stop hook（写进 `.claude/settings.json`，已有同一条时不重复加）：每轮结束运行 `tools/check.py --hook`，校验有错就不让这一轮结束。新建项目自动装 |
 | `team-sync [目录] [--all] [--force]` | 按班子配置重新生成 `collab/成员.md`；默认只刷当前项目，`--all` 刷 NOW 任务表里的全部项目；不是生成的文件要加 `--force`（原文件备份为 `成员.md.bak`） |
 
 模板更新后：`git -C ~/.collab-templates pull`，再对需要的项目运行 `protocol`，对看板运行 `now-update`。

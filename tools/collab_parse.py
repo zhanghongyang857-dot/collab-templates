@@ -94,7 +94,7 @@ def _cards_in(path: Path, kind: str, archived: bool) -> List[Dict[str, Any]]:
     return out
 
 
-def _collect(collab: Path, kind: str, single: str, folder: str) -> List[Dict[str, Any]]:
+def _collect(collab: Path, kind: str, single: str, folder: str, dedup: bool = True) -> List[Dict[str, Any]]:
     cards = _cards_in(collab / single, kind, False)
     d = collab / folder
     if d.is_dir():
@@ -105,12 +105,31 @@ def _collect(collab: Path, kind: str, single: str, folder: str) -> List[Dict[str
     if ad.is_dir():
         for f in sorted({f for g in FILE_GLOBS[kind] for f in ad.glob(g)}):
             cards += _cards_in(f, kind, True)
+    if not dedup:
+        return cards
     seen, uniq = set(), []
     for c in cards:  # 同号以先出现的（未归档）为准
         if c["id"] not in seen:
             seen.add(c["id"])
             uniq.append(c)
     return uniq
+
+
+def raw_cards(collab: Path, kind: str) -> List[Dict[str, Any]]:
+    """不去重的全部卡（含归档），校验重复编号用。kind 为 "G" 或 "T"。"""
+    single, folder = ("目标.md", "目标") if kind == "G" else ("任务.md", "任务")
+    return _collect(collab, kind, single, folder, dedup=False)
+
+
+PRESIDENT = ("总裁", "用户")
+
+
+def approved(card: Dict[str, Any]) -> bool:
+    """有没有总裁批准记录：卡头「批准」写了内容，或流转里有经办人为总裁的一行。"""
+    v = card.get("head", {}).get("批准", "").strip()
+    if v and v.strip(" —-") and not PLACEHOLDER.match(v):
+        return True
+    return any(r.get("经办人", "").strip() in PRESIDENT for r in card.get("flow", []))
 
 
 def load_tasks(collab: Path) -> List[Dict[str, Any]]:
@@ -195,8 +214,33 @@ def goal_summary(goals: List[Dict[str, Any]], issues: Optional[List[Dict[str, An
     return " · ".join(parts)
 
 
+def dispatch_blocks(collab: Path, task_id: str) -> List[str]:
+    """派活前的硬性条件，不满足就不派，--override 也不行：卡已结束、目标没批准、零散任务没批准。
+    没有任务卡时返回空表，由调用方决定（派活脚本要求 --adhoc）。"""
+    tasks = load_tasks(collab)
+    t = next((x for x in tasks if x["id"] == task_id), None)
+    if not t:
+        return []
+    if t["archived"] or t["cls"] == "pass":
+        return [f"{task_id} 已通过或已归档，不再派"]
+    if not t["goal"]:
+        if not approved(t):
+            return [f"{task_id} 是零散任务，还没有总裁批准记录：总裁同意后，在流转里加一行"
+                    "「| MM-DD | 已批准 | 总裁 | 总管 | 批准派发：<原话要点> |」，或卡头写「批准：总裁 MM-DD …」"]
+        return []
+    g = next((x for x in load_goals(collab, tasks) if x["id"] == t["goal"]), None)
+    if not g:
+        return [f"{task_id} 所属目标 {t['goal']} 没有目标卡"]
+    if not g["state"].startswith("进行中"):
+        return [f"目标 {g['id']} 状态是「{g['state'] or '未写'}」，总裁批准后改为「进行中」才能派"]
+    if not approved(g):
+        return [f"目标 {g['id']} 卡头没有「批准：总裁 MM-DD …」记录"]
+    return []
+
+
 def check_dispatch(collab: Path, task_id: str, seat: str, member: str, aliases: List[str]) -> List[str]:
-    """派活前按任务卡和目标流程检查，返回偏离说明（空表示符合）。没有任务卡的零散派活不检查。"""
+    """派活前按任务卡和目标流程检查可偏离的项（席位、人选、阶段顺序），返回偏离说明（空表示符合）。
+    硬性条件见 dispatch_blocks。没有任务卡时不检查。"""
     tasks = load_tasks(collab)
     t = next((x for x in tasks if x["id"] == task_id), None)
     if not t:
@@ -207,8 +251,6 @@ def check_dispatch(collab: Path, task_id: str, seat: str, member: str, aliases: 
         w = (who or "").lower()
         return not w.strip(" —-") or any(a.lower() in w for a in aliases)
 
-    if t["archived"] or t["cls"] == "pass":
-        probs.append(f"{task_id} 已通过或已归档")
     def head_check(key: str) -> None:
         if not who_ok(t["head"].get(key, "")):
             probs.append(f"任务卡写的{key}者是「{t['head'].get(key)}」，派的是 {member}")
@@ -222,8 +264,6 @@ def check_dispatch(collab: Path, task_id: str, seat: str, member: str, aliases: 
     g = next((x for x in goals if x["id"] == t["goal"]), None)
     if not g:
         return probs + [f"{task_id} 所属目标 {t['goal']} 找不到"]
-    if not g["state"].startswith("进行中"):
-        probs.append(f"目标 {g['id']} 状态是「{g['state'] or '未写'}」，还没有批准进行")
     st = next((s for s in g["stages"] if s["no"] == t["stage"]), None)
     if not st:
         return probs + [f"目标 {g['id']} 的流程里没有阶段 {t['stage']}"]

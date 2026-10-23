@@ -11,8 +11,11 @@
   dispatch.py meet I003 [--round N]                朝会：召集议题「与会」表里的成员开下一轮，发言原文写入议题文件
 
 启动语写 "-" 时从标准输入读取。
-派活前按任务卡和所属目标的流程表检查：前面的阶段是否都通过、席位和人选是否一致、目标是否已批准。
-不符合时不派，列出原因（退出码 2）；确需偏离时加 --override "理由"，理由和偏离项记入运行记录。命令在 CLI 结束时才退出，适合总管以后台命令运行。
+派活前三道关，不过就不派（退出码 2）：
+  1. 校验 collab/（tools/check.py）没有错误；确需跳过加 --skip-check "理由"。
+  2. 硬性条件：有任务卡（临时派活加 --adhoc "理由"）；卡没结束；目标已批准，零散任务有总裁批准记录。这一关不能跳过。
+  3. 流程：前面的阶段都通过、席位和人选与流程表和卡头一致；确需偏离加 --override "理由"。
+跳过和偏离的理由都记入运行记录，看板标为「偏离」。命令在 CLI 结束时才退出，适合总管以后台命令运行。
 只用 Python 标准库。
 """
 import argparse
@@ -31,6 +34,7 @@ from typing import Any, Dict, List, Optional
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import collab_parse  # noqa: E402  与看板共用的任务卡、目标卡解析
+import check as collab_check  # noqa: E402  collab/ 校验，与 Stop hook、看板共用
 MEMBERS = HERE / "members.json"  # 没有班子配置时的后备
 TEAM_FILE = Path(os.environ.get("COLLAB_TEAM", "~/.collab-team")).expanduser() / "班子.json"
 RUNS_DIR = "运行记录"
@@ -421,8 +425,23 @@ def read_prompt(p: str) -> str:
     return text
 
 
+def check_gate(project: Path, skip: str) -> Optional[str]:
+    """第一关：collab/ 校验没有错误。返回记入运行记录的偏离说明；不通过时退出。"""
+    errs = collab_check.errors(collab_check.check(project))
+    if not errs:
+        return None
+    if not skip:
+        print("未派活：collab/ 校验没通过，先按协议改好：", file=sys.stderr)
+        print(collab_check.fmt(errs), file=sys.stderr)
+        print('确定是校验器误报才加 --skip-check "理由"（记入运行记录，看板标为偏离）。', file=sys.stderr)
+        sys.exit(2)
+    print(f"按 --skip-check 跳过校验（{len(errs)} 个错误）：{skip}")
+    return f"跳过校验（{len(errs)} 个错误）"
+
+
 def start_run(project: Path, task: str, seat: str, member: str, prompt: str,
-              session: Optional[str] = None, parent: Optional[str] = None, override: str = "") -> int:
+              session: Optional[str] = None, parent: Optional[str] = None, override: str = "",
+              adhoc: str = "", skip_check: str = "") -> int:
     members = load_members()
     if member not in members:
         sys.exit(f"未知成员 {member}，可用：{'、'.join(members)}（在 {members_source()} 配置）")
@@ -431,7 +450,21 @@ def start_run(project: Path, task: str, seat: str, member: str, prompt: str,
         print(f"提醒：班子配置里 {member} 的状态是「{cfg['available']}」，可能会失败", file=sys.stderr)
     if cfg.get("parser") not in PARSERS:
         sys.exit(f"{member} 的事件解析「{cfg.get('parser')}」不认识，可用：{'、'.join(PARSERS)}")
-    deviations = collab_parse.check_dispatch(project / "collab", task, seat, member, cfg.get("aliases", [member]))
+    skipped = check_gate(project, skip_check)
+    collab = project / "collab"
+    has_card = any(t["id"] == task for t in collab_parse.load_tasks(collab))
+    if not has_card and not adhoc:
+        print(f"未派活：{task} 没有任务卡。先建卡（协议「记录规范 · 编号」），总裁批准后再派；"
+              '临时派活（不属于任何任务）加 --adhoc "理由"。', file=sys.stderr)
+        return 2
+    blocks = collab_parse.dispatch_blocks(collab, task)
+    if blocks:
+        print(f"未派活：{task}", file=sys.stderr)
+        for b in blocks:
+            print(f"  - {b}", file=sys.stderr)
+        print("这一关不能用 --override 跳过。", file=sys.stderr)
+        return 2
+    deviations = collab_parse.check_dispatch(collab, task, seat, member, cfg.get("aliases", [member]))
     if deviations and not override:
         print(f"未派活：{task}「{seat}」{member} 与任务卡或目标流程不符：", file=sys.stderr)
         for d in deviations:
@@ -441,6 +474,12 @@ def start_run(project: Path, task: str, seat: str, member: str, prompt: str,
         return 2
     if deviations:
         print(f"按 --override 偏离流程：{override}")
+    reasons = [r for r in (override if deviations else "", f"临时派活：{adhoc}" if adhoc and not has_card else "",
+                           f"跳过校验：{skip_check}" if skipped else "") if r]
+    if adhoc and not has_card:
+        deviations = deviations + ["没有任务卡（临时派活）"]
+    if skipped:
+        deviations = deviations + [skipped]
     rdir = runs_dir(project)
     rid = new_run_id(rdir, task)
     mode = "resume" if session else "start"
@@ -448,7 +487,8 @@ def start_run(project: Path, task: str, seat: str, member: str, prompt: str,
     rec = {"run": rid, "task": task, "seat": seat, "member": member, "mode": "续接" if session else "新会话",
            "session": session or "", "continues": parent or "", "prompt": prompt, "steps": 0,
            "last_action": "", "final": "", "error": "",
-           "deviations": deviations, "override": override if deviations else ""}
+           "deviations": deviations, "override": "；".join(reasons),
+           "adhoc": adhoc if not has_card else ""}
     base = None
     if parent:  # Codex 的用量是会话累计，续接时要减去上一次的累计
         prev = next((r for r in load_runs(project) if r.get("run") == parent), None)
@@ -459,7 +499,8 @@ def start_run(project: Path, task: str, seat: str, member: str, prompt: str,
 # ---------- 子命令 ----------
 
 def cmd_start(a, project: Path) -> int:
-    return start_run(project, a.task, a.seat, a.member, read_prompt(a.prompt), override=a.override or "")
+    return start_run(project, a.task, a.seat, a.member, read_prompt(a.prompt), override=a.override or "",
+                     adhoc=a.adhoc or "", skip_check=a.skip_check or "")
 
 
 def cmd_continue(a, project: Path) -> int:
@@ -478,7 +519,8 @@ def cmd_continue(a, project: Path) -> int:
     if not base.get("session"):
         sys.exit(f"{base['run']} 没有记录会话 ID，无法续接")
     return start_run(project, base["task"], base["seat"], base["member"], read_prompt(a.prompt),
-                     session=base["session"], parent=base["run"], override=a.override or "")
+                     session=base["session"], parent=base["run"], override=a.override or "",
+                     adhoc=base.get("adhoc") or "", skip_check=a.skip_check or "")
 
 
 def _stop_one(project: Path, r: Dict[str, Any]) -> str:
@@ -678,6 +720,7 @@ def _write_round(path: Path, rnd: int, blocks: List[str], state: str) -> None:
 
 
 def cmd_meet(a, project: Path) -> int:
+    check_gate(project, a.skip_check or "")
     collab = project / "collab"
     path = collab_parse.find_issue(collab, a.issue)
     if not path:
@@ -765,10 +808,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = sub.add_parser("start", help="新会话派活")
     p.add_argument("task"); p.add_argument("seat"); p.add_argument("member"); p.add_argument("prompt")
     p.add_argument("--override", help="与任务卡或目标流程不符时仍要派，写明理由")
+    p.add_argument("--adhoc", help="没有任务卡的临时派活，写明理由")
+    p.add_argument("--skip-check", help="collab/ 校验有错仍要派（只用于校验器误报），写明理由")
     p = sub.add_parser("continue", help="续接最近的会话")
     p.add_argument("task"); p.add_argument("seat"); p.add_argument("prompt")
     p.add_argument("--run", help="续接指定派活的会话，而不是该席位最近的一次")
     p.add_argument("--override", help="与任务卡或目标流程不符时仍要续接，写明理由")
+    p.add_argument("--skip-check", help="collab/ 校验有错仍要续接（只用于校验器误报），写明理由")
     p = sub.add_parser("stop", help="停止派活")
     p.add_argument("run", nargs="?"); p.add_argument("--all", action="store_true")
     p = sub.add_parser("list", help="列出派活")
@@ -779,6 +825,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--force", action="store_true", help="已有的也重算")
     p = sub.add_parser("meet", help="朝会：召集议题与会者开下一轮")
     p.add_argument("issue"); p.add_argument("--round", type=int, help="指定轮次（只能是下一轮）")
+    p.add_argument("--skip-check", help="collab/ 校验有错仍要开会（只用于校验器误报），写明理由")
     a = ap.parse_args(argv)
     project = Path(a.project).expanduser().resolve() if a.project else find_project(Path.cwd())
     if not (project / "collab" / "PROGRESS.md").exists():
