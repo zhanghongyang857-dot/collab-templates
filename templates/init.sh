@@ -401,8 +401,8 @@ if [ "$MODE" = now ]; then cat <<MSG
 
 下一步：
   1. 改 NOW/config.json 里的分类（和 NOW.md 大方向的方向名对应）与截止来源
-  2. 看板刷新二选一（见模板仓库 README「NOW 总看板」）：用常驻网页服务（推荐，打开即最新），或在 ~/.claude/settings.json 加 Stop hook 自动重生成 看板.html
-  3. 之后建项目用 NOW_PATH=$DEST/NOW.md init.sh small，项目会自动加进 NOW 任务表
+  2. 启动看板服务看效果：python3 $(cd "$SRC/.." && pwd)/tools/board/server.py --now-dir $DEST/NOW，打开 http://127.0.0.1:3100（开机常驻见 tools/board/README.md）
+  3. 之后建项目用 NOW_PATH=$DEST/NOW.md $SRC/init.sh small，项目会自动加进 NOW 任务表
 MSG
 fi
 
