@@ -1,9 +1,9 @@
-# collab-templates
+# 协作模板
 
 两部分，配合使用：
 
 - **项目模板**（`small` / `large`）：每个任务目录一个 `collab/` 文件夹，`collab/PROGRESS.md` 作为唯一入口，多个 AI 助手共用。
-- **NOW 总看板**（`now`）：一个 `NOW.md` 列出所有任务和大方向，`build.py` 读取各任务的 `PROGRESS.md` 生成可视化的 `看板.html`。
+- **NOW 总看板**（`now`）：一个 `NOW.md` 列出所有任务和大方向；本仓库的看板服务（`tools/board`）读取它和各任务的 `PROGRESS.md`，在 http://127.0.0.1:3100 显示。
 
 ## 项目模板
 
@@ -40,30 +40,32 @@ v4 起：项目 → 目标 → 子任务三层。目标卡（`G00x`）写总裁�
 
 ## 使用
 
-第一次：克隆到固定位置。
+第一次：把本仓库克隆到固定位置，下文以 `~/.collab` 为例（换别的位置时把下面命令里的路径一起换掉）。
 
 ```bash
-gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
+git clone https://github.com/zhanghongyang857-dot/collab-templates.git ~/.collab
 ```
 
-在项目目录里初始化：
+先建 NOW 总看板（见下文「NOW 总看板」），之后新建的项目会自动加进它的任务表。
+
+在项目目录里初始化（`NOW_PATH` 指向你的 `NOW.md`，默认 `~/Desktop/NOW.md`）：
 
 ```bash
-~/.collab-templates/init.sh small
+NOW_PATH=~/Collab/NOW.md ~/.collab/templates/init.sh small
 ```
 
 ```bash
-~/.collab-templates/init.sh large
+NOW_PATH=~/Collab/NOW.md ~/.collab/templates/init.sh large
 ```
 
 其他命令：
 
 ```bash
-~/.collab-templates/init.sh upgrade
+~/.collab/templates/init.sh upgrade
 ```
 
 ```bash
-~/.collab-templates/init.sh protocol
+~/.collab/templates/init.sh protocol
 ```
 
 | 命令 | 作用 |
@@ -78,14 +80,14 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 | `hook [目录]` | 给已有项目装 Claude Code Stop hook（写进 `.claude/settings.json`，已有同一条时不重复加）：每轮结束运行 `tools/check.py --hook`，校验有错就不让这一轮结束。新建项目自动装 |
 | `team-sync [目录] [--all] [--force]` | 按班子配置重新生成 `collab/成员.md`；默认只刷当前项目，`--all` 刷 NOW 任务表里的全部项目；不是生成的文件要加 `--force`（原文件备份为 `成员.md.bak`） |
 
-模板更新后：`git -C ~/.collab-templates pull`，再对需要的项目运行 `protocol`，对看板运行 `now-update`。
+模板更新后：`git -C ~/.collab pull`，再对需要的项目运行 `protocol`，对看板运行 `now-update`。
 
 ## 你的班子
 
 模板里的成员表是空框架。你自己的班子（有哪些成员、型号、档位、成本、唤醒和续接命令、权限）写在**班子配置**里，只写一次，各项目共用：
 
 ```bash
-~/.collab-templates/init.sh team
+~/.collab/templates/init.sh team
 ```
 
 会建立 `~/.collab-team/班子.json`（从 `team-example/班子.json` 复制），按你的成员改写。之后：
@@ -100,13 +102,13 @@ gh repo clone zhanghongyang857-dot/collab-templates ~/.collab-templates
 ## NOW 总看板
 
 ```bash
-~/.collab-templates/init.sh now
+~/.collab/templates/init.sh now ~/Collab
 ```
 
-生成的结构：
+目录不写时默认 `~/Desktop`。建在 `~/Collab` 的好处是看板服务默认就读 `~/Collab/NOW`，启动时不用带参数。生成的结构：
 
 ```
-~/Desktop/
+~/Collab/
   NOW.md            任务表 + 大方向表（只写链接和元信息，不写具体安排）
   NOW/
     今天.md          今天各时段做什么
