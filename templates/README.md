@@ -116,7 +116,7 @@ NOW_PATH=~/Collab/NOW.md ~/.collab/templates/init.sh large
     已完成.md        完成的任务移到这里
     截止.md          近期截止（可在 config.json 换成别的文件）
     config.json      分类与配色、截止来源
-    看板.html        生成结果，不要手改
+    看板.html        手动运行 build.py 生成的静态应急版，不要手改（平时用 3100 网页服务）
 ```
 
 生成代码（`build.py`、`template.html`）不复制进来，用本仓库 `now/NOW/` 那一份：`python3 <仓库>/templates/now/NOW/build.py --now-dir <目录>/NOW`，`NOW.md` 里会写好这条命令。改样式改仓库里的 `template.html`。
