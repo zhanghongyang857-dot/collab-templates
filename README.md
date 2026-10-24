@@ -134,7 +134,6 @@ tools/dispatch         派活脚本：派活、续接、停止、按流程检查
 tools/collab_parse.py  任务卡、目标卡解析（派活脚本和看板共用）
 tools/check.py         collab/ 校验：派活前、Claude 每轮结束（Stop hook）、看板顶部都用它
 tools/codex-viewer     Codex 会话只读回看
-docs/                  需求、班子设计与子员工调用说明
 ```
 
 ## 当前阶段
@@ -143,8 +142,9 @@ docs/                  需求、班子设计与子员工调用说明
 
 还没做的：一键安装脚本、统一的 `collab` 命令和配置、示例项目、自动化测试；把各应用的原生会话接进同一个群聊的协调层，技术方案还没定。产品名称也还没定。
 
-## 设计文档
+## 更多文档
 
-- [需求与管理框架](docs/本地LLM应用群聊协作需求.md)：产品边界、战略委员会、任务负责人制、分级授权、独立验收。
-- [多 Agent 班子设计](docs/多Agent班子设计.md)：总裁、总管、执行、验收各席位的组织思想。
-- [子员工调用](docs/子员工调用.md)：用命令行向 DeepSeek Harness、Codex 派活和续接的做法与验证结果。
+- [模板用法](templates/README.md)：small / large 两版、升级、NOW 总看板、班子配置。
+- [协作协议](templates/large/collab/协议.md)：各席位的职责、目标与流程、派活、验收、上报、朝会、校验与把关。
+- [看板](tools/board/README.md)：NOW 页、项目看板、归档页，以及开机常驻。
+- [派活脚本](tools/dispatch/README.md)：派活、续接、停止、朝会，以及派活前的三道关。
